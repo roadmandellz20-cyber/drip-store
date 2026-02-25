@@ -1,23 +1,22 @@
 // src/app/api/debug/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseServerConfig, supabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "nodejs"; // keep it simple
 
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const { url, key } = getSupabaseServerConfig();
 
   // Don’t leak secrets
-  const anonPreview = anon ? `${anon.slice(0, 6)}...${anon.slice(-6)}` : "";
+  const anonPreview = key ? `${key.slice(0, 6)}...${key.slice(-6)}` : "";
 
-  if (!url || !anon) {
+  if (!url || !key) {
     return NextResponse.json(
       {
         ok: false,
         error: "Missing env vars",
         hasUrl: !!url,
-        hasAnonKey: !!anon,
+        hasAnonKey: !!key,
         url,
         anonPreview,
       },
@@ -25,11 +24,7 @@ export async function GET() {
     );
   }
 
-  const supabase = createClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseServer
     .from("products")
     .select("id, slug, is_active, category_id")
     .eq("is_active", true)

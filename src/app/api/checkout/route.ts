@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const total_cents = items.reduce((sum: number, x: any) => sum + x.priceCents * x.qty, 0);
   const currency = items[0]?.currency || "GMD";
 
-  const { data: order, error: orderErr } = await supabase
+  const { data: order, error: orderErr } = await supabaseServer
     .from("orders")
     .insert([{ customer_name, customer_phone, customer_address, note: note || "", total_cents, currency }])
     .select("*")
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     qty: x.qty,
   }));
 
-  const { error: itemsErr } = await supabase.from("order_items").insert(orderItemsPayload);
+  const { error: itemsErr } = await supabaseServer.from("order_items").insert(orderItemsPayload);
   if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, orderId: order.id });

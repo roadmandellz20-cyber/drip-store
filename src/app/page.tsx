@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { ProductCard } from "@/components/ProductCard";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
-  const { data: products } = await supabase
+  const { data: products } = await supabaseServer
     .from("products")
     .select("id,title,slug,price_cents,currency,cover_image_url")
     .eq("is_active", true)

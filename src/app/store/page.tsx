@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { ProductCard } from "@/components/ProductCard";
 
 export default async function StorePage({
@@ -8,7 +8,7 @@ export default async function StorePage({
 }) {
   const { c } = await searchParams;
 
-  let q = supabase
+  let q = supabaseServer
     .from("products")
     .select("id,title,slug,price_cents,currency,cover_image_url,collection_type,categories(slug)")
     .eq("is_active", true)
