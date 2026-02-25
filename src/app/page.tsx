@@ -1,65 +1,122 @@
-import Image from "next/image";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { ProductCard } from "@/components/ProductCard";
 
-export default function Home() {
+export default async function HomePage() {
+  const { data: products } = await supabase
+    .from("products")
+    .select("id,title,slug,price_cents,currency,cover_image_url")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(8);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main>
+      {/* HERO */}
+      <section className="border-b">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-2">
+          <div>
+            <div className="text-sm text-neutral-600">From street to clean.</div>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
+              New drop. No excuses.
+            </h1>
+            <p className="mt-4 max-w-md text-neutral-600">
+              Premium basics and statement pieces built for daily wear—simple, sharp, and ready.
+            </p>
+
+            <div className="mt-7 flex gap-3">
+              <Link href="/store" className="rounded-2xl bg-black px-5 py-3 text-sm text-white">
+                Shop now
+              </Link>
+              <Link href="/store?c=new" className="rounded-2xl border px-5 py-3 text-sm">
+                New arrivals
+              </Link>
+            </div>
+
+            <div className="mt-10 grid grid-cols-3 gap-4 text-xs text-neutral-600">
+              <div className="rounded-2xl border p-4">
+                <div className="font-medium text-black">Fast delivery</div>
+                <div className="mt-1">Same-day in city</div>
+              </div>
+              <div className="rounded-2xl border p-4">
+                <div className="font-medium text-black">Easy returns</div>
+                <div className="mt-1">7 days</div>
+              </div>
+              <div className="rounded-2xl border p-4">
+                <div className="font-medium text-black">Quality</div>
+                <div className="mt-1">Built to last</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-3xl border bg-neutral-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://placehold.co/1200x1200/png"
+              alt="Lookbook"
+              className="h-full w-full object-cover"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          </div>
         </div>
-      </main>
-    </div>
+      </section>
+
+      {/* CATEGORY GRID */}
+      <section className="mx-auto max-w-6xl px-4 py-14">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Shop by category</h2>
+            <p className="mt-2 text-sm text-neutral-600">Pick a lane. Or don’t.</p>
+          </div>
+          <Link href="/store" className="text-sm text-neutral-700 hover:text-black">
+            View all
+          </Link>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-4">
+          {[
+            { t: "New", c: "new" },
+            { t: "Men", c: "men" },
+            { t: "Women", c: "women" },
+            { t: "Accessories", c: "accessories" },
+          ].map((x) => (
+            <Link
+              key={x.c}
+              href={`/store?c=${x.c}`}
+              className="group relative overflow-hidden rounded-3xl border bg-neutral-100 p-6"
+            >
+              <div className="text-lg font-semibold">{x.t}</div>
+              <div className="mt-2 text-sm text-neutral-600">Shop {x.t.toLowerCase()}</div>
+              <div className="mt-10 h-24 w-full rounded-2xl bg-white/50" />
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100">
+                <div className="absolute inset-0 bg-black/5" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* FEATURED PRODUCTS */}
+      <section className="border-t bg-neutral-50">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Featured</h2>
+            <p className="mt-2 text-sm text-neutral-600">Best sellers + newest pieces.</p>
+          </div>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {(products || []).map((p) => (
+              <ProductCard
+                key={p.id}
+                slug={p.slug}
+                title={p.title}
+                cover={p.cover_image_url}
+                priceCents={p.price_cents}
+                currency={p.currency}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
