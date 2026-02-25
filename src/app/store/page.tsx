@@ -1,43 +1,35 @@
-import { supabaseServer } from "@/lib/supabase-server";
-import { ProductCard } from "@/components/ProductCard";
+"use client";
 
-export default async function StorePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ c?: string }>;
-}) {
-  const { c } = await searchParams;
+import { useMemo, useState } from "react";
+import ProductGrid from "@/components/ProductGrid";
+import { ALL_PRODUCTS } from "@/lib/products";
 
-  let q = supabaseServer
-    .from("products")
-    .select("id,title,slug,price_cents,currency,cover_image_url,collection_type,categories(slug)")
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
+export default function StorePage() {
+  const [q, setQ] = useState("");
 
-  const { data } = await q;
-
-  const filtered = (data || []).filter((p: any) => (c ? p.categories?.slug === c : true));
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return ALL_PRODUCTS;
+    return ALL_PRODUCTS.filter((p) => p.name.toLowerCase().includes(s) || p.sku.includes(s));
+  }, [q]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-12">
-      <h1 className="text-3xl font-semibold tracking-tight">Store</h1>
-      <p className="mt-2 text-sm text-neutral-600">
-        {c ? `Category: ${c}` : "All products"}
-      </p>
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {filtered.map((p: any) => (
-          <ProductCard
-            key={p.id}
-            slug={p.slug}
-            title={p.title}
-            cover={p.cover_image_url}
-            priceCents={p.price_cents}
-            currency={p.currency}
-            collectionType={p.collection_type}
-          />
-        ))}
+    <div className="page">
+      <div className="page__head">
+        <h1 className="page__title">ALL PRODUCTS</h1>
+        <p className="page__sub">Everything in the district. No filler.</p>
       </div>
-    </main>
+
+      <div id="search" className="searchbar">
+        <input
+          className="searchbar__input"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name or SKU…"
+        />
+      </div>
+
+      <ProductGrid products={filtered} />
+    </div>
   );
 }

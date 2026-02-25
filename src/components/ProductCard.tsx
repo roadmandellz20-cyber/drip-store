@@ -1,38 +1,76 @@
+"use client";
+
 import Link from "next/link";
-import { formatMoney } from "@/lib/money";
+import { useMemo, useState } from "react";
+import type { Product } from "@/lib/products";
+import { addToCart } from "@/lib/cart";
 
-type Props = {
-  slug: string;
-  title: string;
-  cover?: string | null;
-  priceCents: number;
-  currency: string;
-  collectionType?: string | null;
-};
+export default function ProductCard({ product }: { product: Product }) {
+  const [hover, setHover] = useState(false);
 
-export function ProductCard({ slug, title, cover, priceCents, currency, collectionType }: Props) {
+  const status = product.limited ? "LIMITED" : "AVAILABLE";
+
+  const tilt = useMemo(() => {
+    // controlled chaos: deterministic tilt from id (no Math.random hydration issues)
+    const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    const deg = ((seed % 7) - 3) * 0.6; // -1.8..+1.8
+    return deg;
+  }, [product.id]);
+
+  const onCop = () => {
+    addToCart(product, "M", 1);
+    window.dispatchEvent(new Event("mugen_cart_update"));
+    window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
+  };
+
   return (
-    <Link
-      href={`/product/${slug}`}
-      className="group block rounded-2xl border border-zinc-200 bg-white p-2 transition duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-lg hover:shadow-black/10"
+    <article
+      className={`p-card ${product.limited ? "p-card--limited" : "p-card--available"}`}
+      style={{ transform: `rotate(${tilt}deg)` }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-[#0f1113] transition duration-300 group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.28)]">
-        {collectionType === "limited" && (
-          <span className="absolute left-3 top-3 z-10 rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-            LIMITED
-          </span>
-        )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cover || "/placeholder.jpg"}
-          alt={title}
-          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-        />
+      <div className="p-card__frame">
+        <div className="p-card__status">
+          <span className="chip">{status}</span>
+          <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
+        </div>
+
+        <Link className="p-card__imgWrap" href={`/product/${product.id}`} aria-label={product.name}>
+          <img
+            className={`p-card__img ${hover ? "is-hidden" : ""}`}
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+          />
+          <img
+            className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
+            src={product.look}
+            alt={`${product.name} lookbook`}
+            loading="lazy"
+          />
+
+          <div className="p-card__camglitch" aria-hidden="true" />
+        </Link>
+
+        <div className="p-card__meta">
+          <div className="p-card__sku">{product.sku}</div>
+          <h3 className="p-card__title">{product.name.toUpperCase()}</h3>
+          <div className="p-card__brandline">{product.brandLine}</div>
+
+          <div className="p-card__row">
+            <button className="btn btn--cop" onClick={onCop}>
+              COP
+            </button>
+
+            <div className="p-card__price">GMD {product.price.toLocaleString()}</div>
+
+            <Link className="p-card__view" href={`/product/${product.id}`}>
+              view →
+            </Link>
+          </div>
+        </div>
       </div>
-      <div className="space-y-1.5 px-1 pb-1 pt-3">
-        <div className="line-clamp-1 text-sm font-bold tracking-tight text-zinc-950">{title}</div>
-        <div className="text-sm text-zinc-500">{formatMoney(priceCents, currency)}</div>
-      </div>
-    </Link>
+    </article>
   );
 }

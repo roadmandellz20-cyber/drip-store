@@ -1,0 +1,478 @@
+/* =========================
+   MUGEN DISTRICT — ARCHIVE
+   Scoped under .archive-root
+   ========================= */
+
+.archive-root {
+  --bg: #050505;
+  --fg: #ffffff;
+  --red: #ff0000;
+  --y: #ffd700;
+  --muted: rgba(255,255,255,.72);
+  --line: rgba(255,255,255,.12);
+  --line2: rgba(255,255,255,.08);
+  --shadow: rgba(0,0,0,.6);
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+  cursor: none; /* custom cursor */
+}
+
+.archive-root * {
+  box-sizing: border-box;
+}
+
+.archive-root a { color: inherit; text-decoration: none; }
+.archive-root img { display: block; max-width: 100%; height: auto; }
+
+.archive-root .container {
+  width: min(1180px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+/* ====== GLOBAL OVERLAYS ====== */
+.archive-root .noise-overlay,
+.archive-root .scanlines {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  mix-blend-mode: overlay;
+}
+
+.archive-root .noise-overlay {
+  opacity: .12;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+}
+
+.archive-root .scanlines {
+  opacity: .08;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,.06) 0px,
+    rgba(255,255,255,.06) 1px,
+    rgba(0,0,0,0) 3px,
+    rgba(0,0,0,0) 6px
+  );
+  animation: scan 6s linear infinite;
+}
+
+@keyframes scan {
+  from { transform: translateY(-20px); }
+  to { transform: translateY(20px); }
+}
+
+/* ====== CUSTOM CURSOR ====== */
+.archive-root .cursor {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  mix-blend-mode: difference;
+  z-index: 60;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ====== HERO ====== */
+.archive-root .hero {
+  position: relative;
+  min-height: clamp(580px, 86vh, 900px);
+  display: grid;
+  align-items: end;
+  padding: 0 0 40px 0;
+  isolation: isolate;
+}
+
+.archive-root .hero-bg {
+  position: absolute;
+  inset: 0;
+  background: url("/archive/assets/hero-bg.jpg") center/cover no-repeat;
+  filter: contrast(1.05) saturate(1.06);
+  transform: translate3d(0,0,0);
+  will-change: transform;
+  z-index: 0;
+}
+
+.archive-root .hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(1200px 500px at 20% 30%, rgba(0,0,0,.15), rgba(0,0,0,.78)),
+    linear-gradient(to bottom, rgba(5,5,5,.35), rgba(5,5,5,.92));
+}
+
+.archive-root .hero-torn {
+  position: absolute;
+  left: -4vw;
+  right: -4vw;
+  top: 12%;
+  height: 42%;
+  background: rgba(255,255,255,.02);
+  border-top: 3px solid rgba(255,255,255,.12);
+  border-bottom: 3px solid rgba(255,255,255,.12);
+  transform: rotate(-2.2deg);
+  z-index: 1;
+  clip-path: polygon(0 12%, 10% 0, 24% 8%, 36% 0, 54% 10%, 70% 2%, 84% 12%, 100% 0, 100% 88%, 86% 100%, 72% 92%, 56% 100%, 40% 92%, 22% 100%, 8% 92%, 0 100%);
+  box-shadow: 0 40px 80px rgba(0,0,0,.35);
+}
+
+.archive-root .hero-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.3fr .7fr;
+  gap: 28px;
+  align-items: end;
+}
+
+.archive-root .hero-title {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  font-size: clamp(56px, 8.2vw, 120px);
+  line-height: .88;
+  text-shadow:
+    0 2px 0 rgba(255,255,255,.04),
+    0 10px 40px rgba(0,0,0,.6);
+  position: relative;
+}
+
+.archive-root .hero-title .red {
+  color: var(--red);
+  text-shadow: 0 10px 38px rgba(255,0,0,.2);
+}
+
+.archive-root .hero-sub {
+  margin-top: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  color: var(--muted);
+  max-width: 58ch;
+  line-height: 1.55;
+}
+
+.archive-root .hero-side {
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.35);
+  padding: 18px;
+  align-self: stretch;
+  display: grid;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.archive-root .hero-side::before {
+  content: "SHIPMENT / MANIFEST";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  opacity: .55;
+}
+
+.archive-root .meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  font-size: 12px;
+  letter-spacing: .08em;
+  border-bottom: 1px dashed var(--line2);
+  padding-bottom: 10px;
+}
+
+.archive-root .meta-row span:last-child { opacity: .7; }
+
+/* ====== BUTTONS (MAGNETIC + GLITCH) ====== */
+.archive-root .cta-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.archive-root .btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.55);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  overflow: hidden;
+  user-select: none;
+  transform: translate3d(0,0,0);
+  will-change: transform;
+}
+
+.archive-root .btn.primary {
+  border-color: rgba(255,0,0,.5);
+}
+
+.archive-root .btn.primary::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle at 30% 40%, rgba(255,0,0,.25), rgba(0,0,0,0) 60%);
+  opacity: .9;
+  transform: rotate(-6deg);
+}
+
+.archive-root .btn .label { position: relative; z-index: 1; }
+
+.archive-root .btn:hover .label {
+  animation: jitter .35s steps(2,end) infinite;
+}
+
+@keyframes jitter {
+  0% { transform: translate(0,0) skewX(0); }
+  25% { transform: translate(-1px,1px) skewX(-6deg); }
+  50% { transform: translate(1px,-1px) skewX(6deg); }
+  75% { transform: translate(-1px,0) skewX(-2deg); }
+  100% { transform: translate(0,0) skewX(0); }
+}
+
+/* ====== TICKER (2 lanes, opposite directions) ====== */
+.archive-root .ticker-wrap {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(0,0,0,.55);
+  overflow: hidden;
+}
+
+.archive-root .ticker {
+  display: flex;
+  gap: 40px;
+  white-space: nowrap;
+  padding: 14px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  letter-spacing: .12em;
+  font-size: 12px;
+  text-transform: uppercase;
+  opacity: .92;
+}
+
+.archive-root .ticker .lane {
+  display: inline-flex;
+  gap: 40px;
+  padding-left: 40px;
+  will-change: transform;
+}
+
+.archive-root .ticker.top .lane { animation: scrollLeft 22s linear infinite; }
+.archive-root .ticker.bottom .lane { animation: scrollRight 26s linear infinite; opacity: .8; }
+
+@keyframes scrollLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes scrollRight {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+/* ====== PRODUCT GRID (CONTROLLED OVERLAP) ====== */
+.archive-root .section {
+  padding: 70px 0;
+  position: relative;
+}
+
+.archive-root .section-title {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-size: clamp(28px, 5.2vw, 64px);
+  margin: 0 0 26px 0;
+}
+
+.archive-root .mugen-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+  position: relative;
+  align-items: start;
+}
+
+.archive-root .product-card {
+  position: relative;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(0,0,0,.55);
+  overflow: hidden;
+  transform-origin: center;
+  will-change: transform;
+  box-shadow: 0 24px 70px rgba(0,0,0,.45);
+}
+
+.archive-root .product-card .tag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  font-size: 11px;
+  letter-spacing: .14em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  background: rgba(0,0,0,.6);
+  z-index: 3;
+}
+
+.archive-root .product-card .meta {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  z-index: 3;
+}
+
+.archive-root .product-card .code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  letter-spacing: .12em;
+  font-size: 12px;
+  background: rgba(0,0,0,.65);
+  border: 1px solid var(--line2);
+  padding: 8px 10px;
+}
+
+.archive-root .product-card .cop {
+  border: 1px solid rgba(255,0,0,.5);
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+  background: rgba(0,0,0,.55);
+}
+
+.archive-root .product-card .cop:hover {
+  animation: jitter .28s steps(2,end) infinite;
+}
+
+.archive-root .product-card figure {
+  position: relative;
+  margin: 0;
+}
+
+.archive-root .product-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Glitch swap on hover: show look image */
+.archive-root .product-card .img-look {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: translate(0,0);
+  transition: opacity .18s ease;
+}
+
+.archive-root .product-card:hover .img-look {
+  opacity: 1;
+  animation: glitchFlash .18s steps(2,end) 1;
+}
+
+@keyframes glitchFlash {
+  0% { transform: translate(0,0); filter: hue-rotate(0deg); }
+  50% { transform: translate(2px,-2px); filter: hue-rotate(35deg); }
+  100% { transform: translate(0,0); filter: hue-rotate(0deg); }
+}
+
+/* controlled chaos placements (NO full stacking) */
+.archive-root .product-card:nth-child(1) { grid-column: 1 / span 6; transform: rotate(-2deg) translateY(0); }
+.archive-root .product-card:nth-child(2) { grid-column: 7 / span 6; transform: rotate(2deg) translateY(34px); }
+.archive-root .product-card:nth-child(3) { grid-column: 2 / span 5; transform: rotate(-1.5deg) translateY(-18px); }
+.archive-root .product-card:nth-child(4) { grid-column: 7 / span 5; transform: rotate(1.5deg) translateY(-10px); }
+.archive-root .product-card:nth-child(5) { grid-column: 4 / span 6; transform: rotate(-2.5deg) translateY(18px); }
+
+.archive-root .product-card:hover { z-index: 20; }
+
+/* ====== REVEAL (SLAM IN) ====== */
+.archive-root .reveal {
+  opacity: 0;
+  transform: translateY(36px) skewY(3deg);
+  transition: opacity .55s ease, transform .55s cubic-bezier(.2,.9,.1,1);
+}
+
+.archive-root .reveal.on {
+  opacity: 1;
+  transform: translateY(0) skewY(0deg);
+}
+
+/* ====== FOOTER MANIFESTO ====== */
+.archive-root .footer {
+  border-top: 1px solid var(--line);
+  padding: 60px 0 90px;
+  background: rgba(0,0,0,.65);
+}
+
+.archive-root .manifesto {
+  display: grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.archive-root .manifesto h3 {
+  margin: 0 0 10px 0;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.archive-root .manifesto p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+}
+
+.archive-root .links {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: rgba(0,0,0,.5);
+}
+
+.archive-root .links a {
+  border-bottom: 1px dashed var(--line2);
+  padding-bottom: 8px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
+}
+
+.archive-root .links a:hover { color: var(--y); }
+
+/* ====== RESPONSIVE ====== */
+@media (max-width: 900px) {
+  .archive-root .hero-grid { grid-template-columns: 1fr; }
+  .archive-root .manifesto { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .archive-root .container { width: calc(100% - 28px); }
+  .archive-root .mugen-grid { grid-template-columns: 1fr; }
+  .archive-root .product-card { grid-column: auto !important; transform: none !important; }
+  .archive-root .hero { min-height: 74vh; padding-bottom: 26px; }
+}

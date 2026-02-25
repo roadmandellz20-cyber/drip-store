@@ -1,0 +1,80 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { cartTotal, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+
+export default function CartDrawer({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [items, setItems] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    setItems(readCart());
+  }, [open]);
+
+  const total = useMemo(() => cartTotal(items), [items]);
+
+  const onRemove = (id: string, size: CartItem["size"]) => {
+    const next = removeFromCart(id, size);
+    setItems(next);
+    window.dispatchEvent(new Event("mugen_cart_update"));
+  };
+
+  return (
+    <div className={`drawer ${open ? "drawer--open" : ""}`} role="dialog" aria-modal="true">
+      <div className="drawer__backdrop" onClick={onClose} />
+      <div className="drawer__panel">
+        <div className="drawer__top">
+          <div className="drawer__title">CART</div>
+          <button className="drawer__close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {items.length === 0 ? (
+          <div className="drawer__empty">
+            Your cart is empty. Don’t move like a tourist.
+          </div>
+        ) : (
+          <div className="drawer__list">
+            {items.map((i) => (
+              <div className="cart-item" key={`${i.id}-${i.size}`}>
+                <img className="cart-item__img" src={i.product.image} alt={i.product.name} />
+                <div className="cart-item__meta">
+                  <div className="cart-item__sku">{i.product.sku}</div>
+                  <div className="cart-item__name">{i.product.name}</div>
+                  <div className="cart-item__row">
+                    <span>Size: {i.size}</span>
+                    <span>Qty: {i.qty}</span>
+                  </div>
+                  <div className="cart-item__row">
+                    <span>GMD {i.product.price.toLocaleString()}</span>
+                    <button className="cart-item__remove" onClick={() => onRemove(i.id, i.size)}>
+                      remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="drawer__bottom">
+          <div className="drawer__total">
+            <span>Total</span>
+            <span>GMD {total.toLocaleString()}</span>
+          </div>
+          <Link className="btn btn--primary" href="/checkout" onClick={onClose}>
+            Proceed to Order →
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

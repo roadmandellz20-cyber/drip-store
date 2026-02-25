@@ -1,50 +1,60 @@
+import type { Product } from "./products";
+
 export type CartItem = {
-  productId: string;
-  slug: string;
-  title: string;
-  cover: string;
-  priceCents: number;
-  currency: string;
-  size: string;
+  id: string;
   qty: number;
+  size: "S" | "M" | "L" | "XL";
+  product: Pick<Product, "id" | "name" | "price" | "image" | "sku">;
 };
 
-const KEY = "drip_cart_v1";
+const KEY = "mugen_cart_v1";
 
-export function getCart(): CartItem[] {
+export function readCart(): CartItem[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]");
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
   } catch {
     return [];
   }
 }
 
-export function setCart(items: CartItem[]) {
+export function writeCart(items: CartItem[]) {
+  if (typeof window === "undefined") return;
   localStorage.setItem(KEY, JSON.stringify(items));
 }
 
-export function addToCart(item: CartItem) {
-  const items = getCart();
-  const idx = items.findIndex(
-    (x) => x.productId === item.productId && x.size === item.size
-  );
-  if (idx >= 0) items[idx] = { ...items[idx], qty: items[idx].qty + item.qty };
-  else items.push(item);
-  setCart(items);
+export function addToCart(product: Product, size: CartItem["size"] = "M", qty = 1) {
+  const items = readCart();
+  const existing = items.find((i) => i.id === product.id && i.size === size);
+  if (existing) existing.qty += qty;
+  else {
+    items.push({
+      id: product.id,
+      qty,
+      size,
+      product: {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        sku: product.sku,
+      },
+    });
+  }
+  writeCart(items);
+  return items;
 }
 
-export function removeFromCart(productId: string, size: string) {
-  setCart(getCart().filter((x) => !(x.productId === productId && x.size === size)));
-}
-
-export function updateQty(productId: string, size: string, qty: number) {
-  const items = getCart().map((x) =>
-    x.productId === productId && x.size === size ? { ...x, qty: Math.max(1, qty) } : x
-  );
-  setCart(items);
+export function removeFromCart(productId: string, size: CartItem["size"]) {
+  const items = readCart().filter((i) => !(i.id === productId && i.size === size));
+  writeCart(items);
+  return items;
 }
 
 export function cartTotal(items: CartItem[]) {
-  return items.reduce((sum, x) => sum + x.priceCents * x.qty, 0);
+  return items.reduce((sum, i) => sum + i.qty * i.product.price, 0);
 }
