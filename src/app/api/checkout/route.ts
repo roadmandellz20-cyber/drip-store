@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   }
 
   const total_cents = items.reduce((sum: number, x: any) => sum + x.priceCents * x.qty, 0);
-  const currency = items[0]?.currency || "USD";
+  const currency = items[0]?.currency || "GMD";
 
   const { data: order, error: orderErr } = await supabase
     .from("orders")

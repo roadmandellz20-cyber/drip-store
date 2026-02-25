@@ -15,7 +15,7 @@ export default function CheckoutPage() {
   useEffect(() => setItemsState(getCart()), []);
 
   const total = cartTotal(items);
-  const currency = items[0]?.currency || "USD";
+  const currency = items[0]?.currency || "GMD";
 
   async function submit() {
     setStatus("");

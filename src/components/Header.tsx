@@ -31,7 +31,14 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
         <Link href="/" className="text-lg font-semibold tracking-tight">
-          DRIP<span className="text-neutral-400">STORE</span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-extrabold tracking-tight">
+              MUGEN DISTRICT
+            </span>
+            <span className="text-[10px] text-zinc-500 tracking-widest">
+              無限
+            </span>
+          </div>
         </Link>
 
         <nav className="hidden items-center gap-4 md:flex">

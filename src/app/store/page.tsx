@@ -10,7 +10,7 @@ export default async function StorePage({
 
   let q = supabase
     .from("products")
-    .select("id,title,slug,price_cents,currency,cover_image_url,categories(slug)")
+    .select("id,title,slug,price_cents,currency,cover_image_url,collection_type,categories(slug)")
     .eq("is_active", true)
     .order("created_at", { ascending: false });
 
@@ -34,6 +34,7 @@ export default async function StorePage({
             cover={p.cover_image_url}
             priceCents={p.price_cents}
             currency={p.currency}
+            collectionType={p.collection_type}
           />
         ))}
       </div>

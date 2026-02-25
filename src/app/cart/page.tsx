@@ -17,7 +17,7 @@ export default function CartPage() {
   }, []);
 
   const total = cartTotal(items);
-  const currency = items[0]?.currency || "USD";
+  const currency = items[0]?.currency || "GMD";
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
