@@ -1,38 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MUGEN DISTRICT (Next.js + Supabase)
 
-## Getting Started
+## Setup
 
-First, run the development server:
+1. Copy `.env.example` to `.env.local`.
+2. Fill all values.
+3. Run dev server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Required Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+ADMIN_ORDER_EMAIL=
+EMAIL_DEBUG=false
+```
 
-## Learn More
+## Resend Sender Requirement
 
-To learn more about Next.js, take a look at the following resources:
+`RESEND_FROM_EMAIL` must be a verified sender/domain in Resend.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
+- Recommended format: `orders@yourdomain.com`.
+- If `RESEND_FROM_EMAIL` is empty or uses common consumer domains (for example `gmail.com`), the app falls back to `onboarding@resend.dev` to keep checkout email flow testable.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Checkout Order Flow
 
-## Deploy on Vercel
+- Frontend submits shipping + cart to `POST /api/orders/create`.
+- Backend validates products/prices from Supabase.
+- Backend generates deterministic `order_number` server-side.
+- Backend inserts `orders` + `order_items`.
+- Backend attempts customer/admin email via Resend.
+- Email failures do **not** fail order creation.
+- API returns `{ order_id: "..." }`.
+- Frontend redirects to `/success?order_id=...`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Migrations
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# drip-store
-# drip-store
+Run SQL files in `supabase/migrations/` in order, then run `migrate_orders.sql` in Supabase SQL Editor for schema-cache-safe alignment.
+
+- `20260226_manual_orders.sql`
+- `20260226_critical_alignment_and_seed.sql`
+- `20260226_master_schema_alignment.sql`

@@ -53,6 +53,13 @@ export function addToCart(product: Product, size: CartItem["size"] = "M", qty = 
     });
   }
   writeCart(items);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("mugen:cart:add", {
+        detail: { id: product.id, size, qty },
+      })
+    );
+  }
   return items;
 }
 
@@ -87,6 +94,11 @@ export function removeFromCart(productId: string, size: CartItem["size"]) {
   const items = readCart().filter((i) => !(i.id === productId && i.size === size));
   writeCart(items);
   return items;
+}
+
+export function clearCart() {
+  writeCart([]);
+  return [];
 }
 
 export function cartCount(items: CartItem[] = readCart()) {

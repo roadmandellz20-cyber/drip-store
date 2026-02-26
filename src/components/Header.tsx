@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import CartDrawer from "./CartDrawer";
 import { readCart } from "@/lib/cart";
@@ -22,11 +22,20 @@ function triggerClickGlitch(el: HTMLElement | null) {
   window.setTimeout(() => el.classList.remove("sv-click"), 220);
 }
 
+function triggerCartAddGlitch(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("cart-add-glitch");
+  void el.offsetWidth;
+  el.classList.add("cart-add-glitch");
+  window.setTimeout(() => el.classList.remove("cart-add-glitch"), 280);
+}
+
 export default function Header() {
   const pathname = usePathname();
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [count, setCount] = useState(0);
+  const cartBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const sync = () => setCount(readCart().reduce((sum, item) => sum + item.qty, 0));
@@ -35,11 +44,14 @@ export default function Header() {
     window.addEventListener("storage", sync);
     window.addEventListener("mugen_cart_update", sync);
     window.addEventListener("mugen:cart", sync);
+    const onCartAdd = () => triggerCartAddGlitch(cartBtnRef.current);
+    window.addEventListener("mugen:cart:add", onCartAdd as EventListener);
 
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("mugen_cart_update", sync);
       window.removeEventListener("mugen:cart", sync);
+      window.removeEventListener("mugen:cart:add", onCartAdd as EventListener);
     };
   }, []);
 
@@ -74,16 +86,17 @@ export default function Header() {
 
         <div className="nav-right">
           <Link
-            className="icon-link"
+            className="icon-link icon-link--navbox icon-link--search"
             href="/store#search"
             aria-label="Search"
             onClick={(e) => triggerClickGlitch(e.currentTarget)}
           >
-            ⌕
+            <span className="icon-link__glyph icon-link__glyph--search">⌕</span>
           </Link>
 
           <button
-            className="icon-link"
+            className="icon-link icon-link--navbox icon-link--cart"
+            ref={cartBtnRef}
             onClick={(e) => {
               triggerClickGlitch(e.currentTarget);
               setCartOpen(true);

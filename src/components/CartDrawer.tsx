@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { cartTotal, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+import { cartTotal, decQty, incQty, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+
+function triggerButtonGlitch(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("btn-glitch");
+  void el.offsetWidth;
+  el.classList.add("btn-glitch");
+  window.setTimeout(() => el.classList.remove("btn-glitch"), 220);
+}
 
 export default function CartDrawer({
   open,
@@ -35,6 +43,16 @@ export default function CartDrawer({
     setItems(next);
   };
 
+  const onInc = (id: string, size: CartItem["size"]) => {
+    const next = incQty(id, size);
+    setItems(next);
+  };
+
+  const onDec = (id: string, size: CartItem["size"]) => {
+    const next = decQty(id, size);
+    setItems(next);
+  };
+
   return (
     <div className={`drawer ${open ? "drawer--open" : ""}`} role="dialog" aria-modal="true">
       <div className="drawer__backdrop" onClick={onClose} />
@@ -60,11 +78,42 @@ export default function CartDrawer({
                   <div className="cart-item__name">{i.product.name}</div>
                   <div className="cart-item__row">
                     <span>Size: {i.size}</span>
-                    <span>Qty: {i.qty}</span>
+                    <div className="cart-item__qty">
+                      <button
+                        className="cart-item__qtybtn"
+                        type="button"
+                        aria-label="Decrease quantity"
+                        onClick={(e) => {
+                          triggerButtonGlitch(e.currentTarget);
+                          onDec(i.id, i.size);
+                        }}
+                      >
+                        -
+                      </button>
+                      <span className="cart-item__qtyval">{i.qty}</span>
+                      <button
+                        className="cart-item__qtybtn"
+                        type="button"
+                        aria-label="Increase quantity"
+                        onClick={(e) => {
+                          triggerButtonGlitch(e.currentTarget);
+                          onInc(i.id, i.size);
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                   <div className="cart-item__row">
                     <span className="cart-item__price">GMD {i.product.price.toLocaleString()}</span>
-                    <button className="cart-item__remove" onClick={() => onRemove(i.id, i.size)}>
+                    <button
+                      className="cart-item__remove"
+                      type="button"
+                      onClick={(e) => {
+                        triggerButtonGlitch(e.currentTarget);
+                        onRemove(i.id, i.size);
+                      }}
+                    >
                       remove
                     </button>
                   </div>
