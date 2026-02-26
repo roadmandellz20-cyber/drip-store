@@ -222,10 +222,12 @@ async function sendOrderEmails(params: {
   const result = {
     customer: "skipped" as "sent" | "failed" | "skipped",
     admin: "skipped" as "sent" | "failed" | "skipped",
+    errors: [] as string[],
   };
 
   const customerEmail = asString(params.shipping.email);
   const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
+  const forcedRecipient = adminEmail;
 
   const emailItems: EmailOrderItem[] = params.lines.map((line) => ({
     title: line.title,
@@ -248,32 +250,69 @@ async function sendOrderEmails(params: {
     items: emailItems,
   };
 
-  if (customerEmail) {
-    const customerTemplate = customerOrderEmail(payload);
-    const customerResult = await sendEmail({
-      to: customerEmail,
-      subject: customerTemplate.subject,
-      html: customerTemplate.html,
-      text: customerTemplate.text,
-    });
-    result.customer = "sent";
-    console.log(
-      `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"}`
-    );
+  if (!forcedRecipient) {
+    const message = "ADMIN_ORDER_EMAIL is empty; skipping all order emails.";
+    result.errors.push(message);
+    console.error(`[orders/create] ${message}`);
+    return result;
   }
 
-  if (adminEmail) {
+  if (customerEmail) {
+    try {
+      const customerTemplate = customerOrderEmail(payload);
+      const customerResult = await sendEmail({
+        to: forcedRecipient,
+        subject: customerTemplate.subject,
+        html: customerTemplate.html,
+        text: customerTemplate.text,
+      });
+      result.customer = "sent";
+      console.log(
+        `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"} routed_to=${forcedRecipient}`
+      );
+    } catch (error) {
+      result.customer = "failed";
+      const message = errorMessage(error);
+      result.errors.push(`customer: ${message}`);
+      console.error(`[orders/create] resend customer error=${message}`);
+      if (error instanceof ResendRequestError) {
+        console.error("[orders/create] resend customer failure payload", {
+          status: error.status,
+          body: error.body,
+          from: error.from,
+          to: error.to,
+          subject: error.subject,
+        });
+      }
+    }
+  }
+
+  try {
     const adminTemplate = adminOrderEmail(payload);
     const adminResult = await sendEmail({
-      to: adminEmail,
+      to: forcedRecipient,
       subject: adminTemplate.subject,
       html: adminTemplate.html,
       text: adminTemplate.text,
     });
     result.admin = "sent";
     console.log(
-      `[orders/create] resend admin status=${adminResult.status} id=${adminResult.id || "n/a"}`
+      `[orders/create] resend admin status=${adminResult.status} id=${adminResult.id || "n/a"} routed_to=${forcedRecipient}`
     );
+  } catch (error) {
+    result.admin = "failed";
+    const message = errorMessage(error);
+    result.errors.push(`admin: ${message}`);
+    console.error(`[orders/create] resend admin error=${message}`);
+    if (error instanceof ResendRequestError) {
+      console.error("[orders/create] resend admin failure payload", {
+        status: error.status,
+        body: error.body,
+        from: error.from,
+        to: error.to,
+        subject: error.subject,
+      });
+    }
   }
 
   return result;
@@ -467,68 +506,27 @@ export async function POST(request: Request) {
       admin_order_email: !!process.env.ADMIN_ORDER_EMAIL,
     });
 
-    let emailResult: Awaited<ReturnType<typeof sendOrderEmails>>;
-    try {
-      emailResult = await sendOrderEmails({
-        orderNumber: insertedOrderNumber,
-        shipping,
-        shippingAddress,
-        currency,
-        totalCents,
-        lines,
-      });
-    } catch (error) {
-      const failureMessage = errorMessage(error);
-      const emailMetaUpdate = await supabaseAdmin
-        .from("orders")
-        .update({
-          email_status: "failed",
-          email_error: failureMessage,
-        })
-        .eq("id", orderId);
-
-      if (emailMetaUpdate.error) {
-        console.error(
-          `[orders/create] email metadata update skipped: ${emailMetaUpdate.error.message}`
-        );
-      }
-
-      if (error instanceof ResendRequestError) {
-        console.error("[orders/create] resend failure payload", {
-          status: error.status,
-          body: error.body,
-          from: error.from,
-          to: error.to,
-          subject: error.subject,
-        });
-
-        return NextResponse.json(
-          {
-            error: "Resend request failed",
-            order_id: orderId,
-            resend_status: error.status,
-            resend_body: error.body,
-            resend_from: error.from,
-            resend_to: error.to,
-            resend_subject: error.subject,
-          },
-          { status: 500 }
-        );
-      }
-
-      throw error;
-    }
+    const emailResult = await sendOrderEmails({
+      orderNumber: insertedOrderNumber,
+      shipping,
+      shippingAddress,
+      currency,
+      totalCents,
+      lines,
+    });
 
     const emailAdminSent = emailResult.admin === "sent";
     const emailCustomerSent = emailResult.customer === "sent";
     const derivedEmailStatus =
-      emailAdminSent && emailCustomerSent
+      emailResult.errors.length === 0
         ? "sent"
-        : emailAdminSent || emailCustomerSent
+        : emailCustomerSent || emailAdminSent
           ? "partial"
-          : "skipped";
-    const emailError = null;
-    const warning = null;
+          : "failed";
+    const emailError = emailResult.errors.length ? emailResult.errors.join(" | ") : null;
+    const warning = emailError
+      ? "Order was created but one or more emails failed to send."
+      : null;
 
     console.log(
       `[orders/create] email_status=${derivedEmailStatus} customer=${emailResult.customer} admin=${emailResult.admin}`
@@ -559,20 +557,6 @@ export async function POST(request: Request) {
       warning,
     });
   } catch (error) {
-    if (error instanceof ResendRequestError) {
-      return NextResponse.json(
-        {
-          error: "Resend request failed",
-          resend_status: error.status,
-          resend_body: error.body,
-          resend_from: error.from,
-          resend_to: error.to,
-          resend_subject: error.subject,
-        },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json(
       { error: errorMessage(error) },
       { status: 500 }
