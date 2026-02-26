@@ -118,7 +118,7 @@ export default function ArchiveClient() {
           </h1>
 
           <div className="md-sub">
-            90s scanlations. DIY punk zines. Shibuya back-alley grit.
+            Unlimited territory. An underground archive born in The Gambia, refined in the streets of Tokyo. Infinite energy—Zero limits.
           </div>
 
           <div className="md-ctaRow">
@@ -164,8 +164,8 @@ export default function ArchiveClient() {
               </div>
 
               <figure className="md-figure">
-                <img className="md-img md-imgBase" src={p.img} alt={p.title} />
-                <img className="md-img md-imgLook" src={p.look} alt={`${p.title} look`} />
+                <img className="md-img md-imgBase" src={p.img} alt={p.title} loading="lazy" />
+                <img className="md-img md-imgLook" src={p.look} alt={`${p.title} look`} loading="lazy" />
                 <div className="md-glitchOverlay" aria-hidden="true" />
               </figure>
 
@@ -210,21 +210,7 @@ export default function ArchiveClient() {
         <div className="md-footerGrid" data-reveal>
           <div className="md-paperBlock">
             <div className="md-paperHead">MANIFESTO</div>
-            <p>
-              From street to clean — but never safe.
-              <br />
-              This is controlled chaos: hard edges, raw texture, loud presence.
-            </p>
-            <p className="md-stamp">DISCARDED TOKYO NEWSPAPER • ISSUE 001</p>
-          </div>
-
-          <div className="md-paperBlock">
-            <div className="md-paperHead">LINKS</div>
-            <div className="md-links">
-              <a href="/store">Store</a>
-              <a href="/checkout">Checkout</a>
-              <a href="#grid">Product Grid</a>
-            </div>
+            <p>{"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}</p>
             <div className="md-links md-links2">
               <a href="#" aria-disabled="true">
                 Instagram
@@ -235,6 +221,16 @@ export default function ArchiveClient() {
               <a href="#" aria-disabled="true">
                 X
               </a>
+            </div>
+            <p className="md-stamp">DISCARDED TOKYO NEWSPAPER • ISSUE 001</p>
+          </div>
+
+          <div className="md-paperBlock">
+            <div className="md-paperHead">LINKS</div>
+            <div className="md-links">
+              <a href="/store">Store</a>
+              <a href="/checkout">Checkout</a>
+              <a href="#grid">Product Grid</a>
             </div>
           </div>
 

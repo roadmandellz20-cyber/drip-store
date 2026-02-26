@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
 
+function triggerButtonGlitch(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("btn-glitch");
+  void el.offsetWidth;
+  el.classList.add("btn-glitch");
+  window.setTimeout(() => el.classList.remove("btn-glitch"), 220);
+}
+
+function triggerCardPulse(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("p-card--pulse");
+  void el.offsetWidth;
+  el.classList.add("p-card--pulse");
+  window.setTimeout(() => el.classList.remove("p-card--pulse"), 140);
+}
+
 export default function ProductCard({ product }: { product: Product }) {
   const [hover, setHover] = useState(false);
+  const cardRef = useRef<HTMLElement | null>(null);
 
   const status = product.limited ? "LIMITED" : "AVAILABLE";
 
@@ -19,12 +36,13 @@ export default function ProductCard({ product }: { product: Product }) {
 
   const onCop = () => {
     addToCart(product, "M", 1);
-    window.dispatchEvent(new Event("mugen_cart_update"));
     window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
+    triggerCardPulse(cardRef.current);
   };
 
   return (
     <article
+      ref={cardRef}
       className={`p-card ${product.limited ? "p-card--limited" : "p-card--available"}`}
       style={{ transform: `rotate(${tilt}deg)` }}
       onMouseEnter={() => setHover(true)}
@@ -59,13 +77,24 @@ export default function ProductCard({ product }: { product: Product }) {
           <div className="p-card__brandline">{product.brandLine}</div>
 
           <div className="p-card__row">
-            <button className="btn btn--cop" onClick={onCop}>
+            <button
+              className={`btn ${product.limited ? "btn--primary" : "btn--ghost"}`}
+              onClick={(e) => {
+                triggerButtonGlitch(e.currentTarget);
+                onCop();
+              }}
+              type="button"
+            >
               COP
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>
 
-            <Link className="p-card__view" href={`/product/${product.id}`}>
+            <Link
+              className="p-card__view"
+              href={`/product/${product.id}`}
+              onClick={(e) => triggerButtonGlitch(e.currentTarget)}
+            >
               view →
             </Link>
           </div>

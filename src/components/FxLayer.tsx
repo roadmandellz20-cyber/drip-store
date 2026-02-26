@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 export default function FxLayer() {
   const cursorRef = useRef<HTMLDivElement | null>(null);
-  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    // enable after mount (prevents SSR/CSR mismatch)
-    setEnabled(true);
-
     const el = cursorRef.current;
     if (!el) return;
 
@@ -28,17 +24,30 @@ export default function FxLayer() {
       el.style.opacity = "0";
     };
 
+    const onClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const clickable = target.closest("button, .btn, .icon-link");
+      if (!(clickable instanceof HTMLElement)) return;
+
+      clickable.classList.remove("btn-glitch");
+      void clickable.offsetWidth;
+      clickable.classList.add("btn-glitch");
+      window.setTimeout(() => clickable.classList.remove("btn-glitch"), 220);
+    };
+
     window.addEventListener("mousemove", onMove, { passive: true });
     window.addEventListener("mouseleave", onLeave);
+    document.addEventListener("click", onClick);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseleave", onLeave);
+      document.removeEventListener("click", onClick);
     };
   }, []);
-
-  if (!enabled) return null;
 
   return (
     <>

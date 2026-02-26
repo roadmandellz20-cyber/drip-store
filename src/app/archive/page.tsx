@@ -18,14 +18,14 @@ export default function ArchivePage() {
           </h1>
 
           <p className="hero__sub">
-            90s scanlations. DIY punk zines. Shibuya back-alley grit. Controlled chaos—sharp edges only.
+            Unlimited territory. An underground archive born in The Gambia, refined in the streets of Tokyo. Infinite energy—Zero limits.
           </p>
 
           <div className="hero__cta">
-            <Link className="btn btn--primary" href="/store">
+            <Link className="btn btn--ghost" href="/store">
               Enter Store →
             </Link>
-            <Link className="btn btn--ghost" href="/limited">
+            <Link className="btn btn--primary" href="/limited">
               View Limited →
             </Link>
           </div>
@@ -36,7 +36,7 @@ export default function ArchivePage() {
             </div>
             <div className="hanko__meta">
               <div className="hanko__jp">無限地区</div>
-              <div className="hanko__est">EST. 2024 // TOKYO</div>
+              <div className="hanko__est">EST. 2026 // THE GAMBIA</div>
             </div>
           </div>
         </div>
@@ -67,10 +67,12 @@ export default function ArchivePage() {
         <div className="footer__grid">
           <div className="footer__card">
             <div className="footer__title">MANIFESTO</div>
-            <p>
-              From street to clean — but never safe.<br />
-              Controlled chaos: hard edges, raw texture, loud presence.
-            </p>
+            <p>{"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}</p>
+            <div className="footer__socials">
+              <a href="#">INSTAGRAM</a>
+              <a href="#">TIKTOK</a>
+              <a href="#">X</a>
+            </div>
             <div className="footer__small">DISCARDED TOKYO NEWSPAPER • ISSUE 001</div>
           </div>
 
@@ -80,9 +82,6 @@ export default function ArchivePage() {
               <Link href="/store">All Products</Link>
               <Link href="/new">New</Link>
               <Link href="/limited">Limited</Link>
-              <a href="#">Instagram</a>
-              <a href="#">TikTok</a>
-              <a href="#">X</a>
             </div>
           </div>
 

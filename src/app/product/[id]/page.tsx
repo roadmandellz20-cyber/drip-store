@@ -27,7 +27,6 @@ export default function ProductDetailPage() {
 
   const onAdd = () => {
     addToCart(product, size, 1);
-    window.dispatchEvent(new Event("mugen_cart_update"));
     window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
   };
 
@@ -35,7 +34,7 @@ export default function ProductDetailPage() {
     <div className="page">
       <div className="detail">
         <div className="detail__img">
-          <img src={product.image} alt={product.name} />
+          <img src={product.image} alt={product.name} loading="lazy" />
         </div>
 
         <div className="detail__info">

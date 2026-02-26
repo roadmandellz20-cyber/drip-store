@@ -14,8 +14,18 @@ export default function CartDrawer({
   const [items, setItems] = useState<CartItem[]>([]);
 
   useEffect(() => {
-    if (!open) return;
-    setItems(readCart());
+    const sync = () => setItems(readCart());
+    if (open) sync();
+
+    window.addEventListener("storage", sync);
+    window.addEventListener("mugen_cart_update", sync);
+    window.addEventListener("mugen:cart", sync);
+
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("mugen_cart_update", sync);
+      window.removeEventListener("mugen:cart", sync);
+    };
   }, [open]);
 
   const total = useMemo(() => cartTotal(items), [items]);
@@ -23,7 +33,6 @@ export default function CartDrawer({
   const onRemove = (id: string, size: CartItem["size"]) => {
     const next = removeFromCart(id, size);
     setItems(next);
-    window.dispatchEvent(new Event("mugen_cart_update"));
   };
 
   return (
@@ -45,7 +54,7 @@ export default function CartDrawer({
           <div className="drawer__list">
             {items.map((i) => (
               <div className="cart-item" key={`${i.id}-${i.size}`}>
-                <img className="cart-item__img" src={i.product.image} alt={i.product.name} />
+                <img className="cart-item__img" src={i.product.image} alt={i.product.name} loading="lazy" />
                 <div className="cart-item__meta">
                   <div className="cart-item__sku">{i.product.sku}</div>
                   <div className="cart-item__name">{i.product.name}</div>
@@ -54,7 +63,7 @@ export default function CartDrawer({
                     <span>Qty: {i.qty}</span>
                   </div>
                   <div className="cart-item__row">
-                    <span>GMD {i.product.price.toLocaleString()}</span>
+                    <span className="cart-item__price">GMD {i.product.price.toLocaleString()}</span>
                     <button className="cart-item__remove" onClick={() => onRemove(i.id, i.size)}>
                       remove
                     </button>

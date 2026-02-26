@@ -5,10 +5,14 @@ export default function Footer() {
         <div className="grid gap-6 md:grid-cols-3">
           <div className="border border-white/10 p-5">
             <div className="text-sm font-semibold tracking-[0.2em]">MANIFESTO</div>
-            <p className="mt-3 text-sm text-white/70 leading-relaxed">
-              From street to clean — but never safe. <br />
-              Controlled chaos: hard edges, raw texture, loud presence.
+            <p className="mt-3 text-sm font-normal text-white/70 leading-relaxed">
+              {"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}
             </p>
+            <div className="mt-4 space-y-2 text-sm font-normal tracking-[0.12em] text-white">
+              <a className="block hover:text-white/80" href="#">INSTAGRAM</a>
+              <a className="block hover:text-white/80" href="#">TIKTOK</a>
+              <a className="block hover:text-white/80" href="#">X</a>
+            </div>
             <div className="mt-4 text-xs tracking-[0.2em] text-white/60">
               DISCARDED TOKYO NEWSPAPER • ISSUE 001
             </div>
@@ -20,9 +24,6 @@ export default function Footer() {
               <a className="block hover:text-white" href="/store">Store</a>
               <a className="block hover:text-white" href="/checkout">Checkout</a>
               <a className="block hover:text-white" href="/archive#grid">Product Grid</a>
-              <a className="block hover:text-white" href="#">Instagram</a>
-              <a className="block hover:text-white" href="#">TikTok</a>
-              <a className="block hover:text-white" href="#">X</a>
             </div>
           </div>
 
