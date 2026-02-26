@@ -114,7 +114,12 @@ export default function CheckoutPage() {
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         order_id?: string | null;
+        warning?: string;
+        email_admin_sent?: boolean | null;
+        email_customer_sent?: boolean | null;
+        email_error?: string | null;
       };
+      console.log("order create response", data);
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to place order.");
@@ -122,7 +127,12 @@ export default function CheckoutPage() {
 
       const orderId = typeof data.order_id === "string" ? data.order_id.trim() : "";
       if (!orderId) {
-        throw new Error("Order created but no order id returned.");
+        setError("Order was created but no order reference was returned. Please try again.");
+        return;
+      }
+
+      if (typeof data.warning === "string" && data.warning.trim()) {
+        console.warn("[checkout] order created with warning", data.warning);
       }
 
       succeeded = true;

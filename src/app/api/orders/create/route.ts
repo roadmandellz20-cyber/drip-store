@@ -5,7 +5,7 @@ import {
   customerOrderEmail,
   type EmailOrderItem,
 } from "@/lib/email/templates";
-import { sendEmail } from "@/lib/email/send";
+import { ResendRequestError, sendEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
 
@@ -179,7 +179,7 @@ function buildProductLookup(rows: Record<string, unknown>[]) {
 async function findExistingOrderByIdempotencyKey(idempotencyKey: string) {
   const query = await supabaseAdmin
     .from("orders")
-    .select("id,order_number")
+    .select("id,order_number,email_status,email_error")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
 
@@ -267,6 +267,15 @@ async function sendOrderEmails(params: {
       const message = errorMessage(error);
       result.errors.push(`customer: ${message}`);
       console.error(`[orders/create] resend customer error=${message}`);
+      if (error instanceof ResendRequestError) {
+        console.error("[orders/create] resend customer failure payload", {
+          status: error.status,
+          body: error.body,
+          from: error.from,
+          to: error.to,
+          subject: error.subject,
+        });
+      }
     }
   }
 
@@ -288,6 +297,15 @@ async function sendOrderEmails(params: {
       const message = errorMessage(error);
       result.errors.push(`admin: ${message}`);
       console.error(`[orders/create] resend admin error=${message}`);
+      if (error instanceof ResendRequestError) {
+        console.error("[orders/create] resend admin failure payload", {
+          status: error.status,
+          body: error.body,
+          from: error.from,
+          to: error.to,
+          subject: error.subject,
+        });
+      }
     }
   }
 
@@ -296,8 +314,11 @@ async function sendOrderEmails(params: {
 
 export async function POST(request: Request) {
   try {
-    console.log("[orders/create] RESEND_FROM_EMAIL", process.env.RESEND_FROM_EMAIL || "(empty)");
-    console.log("[orders/create] ADMIN_ORDER_EMAIL", process.env.ADMIN_ORDER_EMAIL || "(empty)");
+    console.log("[orders/create] env_presence", {
+      has_resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
+      has_resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
+      has_admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
+    });
 
     const body = (await request.json()) as {
       shipping?: IncomingShipping;
@@ -345,6 +366,9 @@ export async function POST(request: Request) {
           reused: true,
           order_id: existingId,
           order_number: existingOrderNumber,
+          email_admin_sent: null,
+          email_customer_sent: null,
+          email_error: asString(existingOrder.email_error) || null,
         });
       }
     }
@@ -436,6 +460,9 @@ export async function POST(request: Request) {
             reused: true,
             order_id: duplicateId,
             order_number: duplicateNumber,
+            email_admin_sent: null,
+            email_customer_sent: null,
+            email_error: asString(duplicate.email_error) || null,
           });
         }
       }
@@ -483,6 +510,12 @@ export async function POST(request: Request) {
         : emailResult.customer === "sent" || emailResult.admin === "sent"
           ? "partial"
           : "failed";
+    const emailError = emailResult.errors.length ? emailResult.errors.join(" | ") : null;
+    const emailAdminSent = emailResult.admin === "sent";
+    const emailCustomerSent = emailResult.customer === "sent";
+    const warning = emailError
+      ? "Order was created but one or more emails failed to send."
+      : null;
 
     console.log(
       `[orders/create] email_status=${derivedEmailStatus} customer=${emailResult.customer} admin=${emailResult.admin}`
@@ -493,7 +526,7 @@ export async function POST(request: Request) {
       .from("orders")
       .update({
         email_status: derivedEmailStatus,
-        email_error: emailResult.errors.length ? emailResult.errors.join(" | ") : null,
+        email_error: emailError,
       })
       .eq("id", orderId);
 
@@ -507,6 +540,10 @@ export async function POST(request: Request) {
       ok: true,
       order_id: orderId,
       order_number: insertedOrderNumber,
+      email_admin_sent: emailAdminSent,
+      email_customer_sent: emailCustomerSent,
+      email_error: emailError,
+      warning,
     });
   } catch (error) {
     return NextResponse.json(
