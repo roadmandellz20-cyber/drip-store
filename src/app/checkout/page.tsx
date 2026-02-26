@@ -135,6 +135,12 @@ export default function CheckoutPage() {
         console.warn("[checkout] order created with warning", data.warning);
       }
 
+      try {
+        localStorage.setItem("last_order_id", orderId);
+      } catch {
+        // Ignore localStorage write failures.
+      }
+
       succeeded = true;
       clearCart();
       router.push(`/success?order_id=${encodeURIComponent(orderId)}`);

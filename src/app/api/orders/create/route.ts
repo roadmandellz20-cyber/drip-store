@@ -139,9 +139,9 @@ function isShippingValid(shipping: IncomingShipping) {
   );
 }
 
-function fallbackOrderNumber(orderId: string) {
+function makeOrderRef(orderId: string) {
   const token = orderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
-  return `MGN-${new Date().getUTCFullYear()}-${token || "000000"}`;
+  return `MGN-${token || "00000000"}`;
 }
 
 async function fetchProductsFromSupabase() {
@@ -179,7 +179,7 @@ function buildProductLookup(rows: Record<string, unknown>[]) {
 async function findExistingOrderByIdempotencyKey(idempotencyKey: string) {
   const query = await supabaseAdmin
     .from("orders")
-    .select("id,order_number,email_status,email_error")
+    .select("id,email_status,email_error")
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
 
@@ -188,27 +188,6 @@ async function findExistingOrderByIdempotencyKey(idempotencyKey: string) {
   }
 
   return query.data;
-}
-
-async function generateOrderNumber() {
-  const result = await supabaseAdmin.rpc("next_order_number");
-
-  if (!result.error && typeof result.data === "string" && result.data.trim()) {
-    return result.data.trim();
-  }
-
-  const fallbackToken =
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()
-      : Math.floor(Math.random() * 1_000_000)
-          .toString()
-          .padStart(6, "0");
-  const fallback = `MGN-${new Date().getUTCFullYear()}-${fallbackToken}`;
-
-  console.warn(
-    `[orders/create] next_order_number rpc unavailable (${result.error?.message || "empty result"}). Using fallback ${fallback}.`
-  );
-  return fallback;
 }
 
 async function sendOrderEmails(params: {
@@ -365,13 +344,12 @@ export async function POST(request: Request) {
       const existingOrder = await findExistingOrderByIdempotencyKey(idempotencyKey);
       if (existingOrder?.id) {
         const existingId = asString(existingOrder.id);
-        const existingOrderNumber = asString(existingOrder.order_number) || fallbackOrderNumber(existingId);
 
         return NextResponse.json({
           ok: true,
           reused: true,
           order_id: existingId,
-          order_number: existingOrderNumber,
+          order_ref: makeOrderRef(existingId),
           email_admin_sent: null,
           email_customer_sent: null,
           email_error: asString(existingOrder.email_error) || null,
@@ -431,13 +409,10 @@ export async function POST(request: Request) {
     const shippingAddress = formatAddress(shipping);
     const deliveryNote = asString(shipping.deliveryNote);
 
-    const orderNumber = await generateOrderNumber();
-
     const orderInsert = await supabaseAdmin
       .from("orders")
       .insert([
         {
-          order_number: orderNumber,
           customer_name: asString(shipping.name),
           customer_email: asString(shipping.email),
           customer_phone: asString(shipping.phone),
@@ -448,7 +423,7 @@ export async function POST(request: Request) {
           idempotency_key: idempotencyKey || null,
         },
       ])
-      .select("id,order_number")
+      .select("id")
       .single();
 
     if (orderInsert.error) {
@@ -460,12 +435,11 @@ export async function POST(request: Request) {
         const duplicate = await findExistingOrderByIdempotencyKey(idempotencyKey);
         if (duplicate?.id) {
           const duplicateId = asString(duplicate.id);
-          const duplicateNumber = asString(duplicate.order_number) || fallbackOrderNumber(duplicateId);
           return NextResponse.json({
             ok: true,
             reused: true,
             order_id: duplicateId,
-            order_number: duplicateNumber,
+            order_ref: makeOrderRef(duplicateId),
             email_admin_sent: null,
             email_customer_sent: null,
             email_error: asString(duplicate.email_error) || null,
@@ -477,13 +451,13 @@ export async function POST(request: Request) {
     }
 
     const orderId = asString(orderInsert.data?.id);
-    const insertedOrderNumber = asString(orderInsert.data?.order_number) || orderNumber;
 
     if (!orderId) {
       throw new Error("Order created without id.");
     }
+    const orderRef = makeOrderRef(orderId);
 
-    console.log(`[orders/create] inserted order id=${orderId} order_number=${insertedOrderNumber}`);
+    console.log(`[orders/create] inserted order id=${orderId} order_ref=${orderRef}`);
 
     const orderItemsInsert = await supabaseAdmin.from("order_items").insert(
       lines.map((line) => ({
@@ -507,7 +481,7 @@ export async function POST(request: Request) {
     });
 
     const emailResult = await sendOrderEmails({
-      orderNumber: insertedOrderNumber,
+      orderNumber: orderRef,
       shipping,
       shippingAddress,
       currency,
@@ -550,7 +524,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       order_id: orderId,
-      order_number: insertedOrderNumber,
+      order_ref: orderRef,
       email_admin_sent: emailAdminSent,
       email_customer_sent: emailCustomerSent,
       email_error: emailError,
