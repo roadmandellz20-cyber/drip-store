@@ -59,13 +59,19 @@ function isEmailDebugEnabled() {
 function getResendConfig() {
   const apiKey = process.env.RESEND_API_KEY;
   const configuredFrom = (process.env.RESEND_FROM_EMAIL || "").trim();
+  const normalizedFrom = configuredFrom.toLowerCase();
   const fromDomain = configuredFrom.split("@")[1]?.toLowerCase() || "";
+  const containsGmail = normalizedFrom.includes("gmail.com");
   const shouldFallback =
-    !configuredFrom || CONSUMER_EMAIL_DOMAINS.has(fromDomain);
+    !configuredFrom || containsGmail || CONSUMER_EMAIL_DOMAINS.has(fromDomain);
 
   const from = shouldFallback ? FALLBACK_FROM_EMAIL : configuredFrom;
 
-  if (shouldFallback && configuredFrom) {
+  if (containsGmail && configuredFrom) {
+    console.warn(
+      `[email] RESEND_FROM_EMAIL (${configuredFrom}) contains gmail.com. Temporarily forcing ${FALLBACK_FROM_EMAIL}.`
+    );
+  } else if (shouldFallback && configuredFrom) {
     console.warn(
       `[email] RESEND_FROM_EMAIL (${configuredFrom}) may be unverified. Falling back to ${FALLBACK_FROM_EMAIL}.`
     );
@@ -91,26 +97,6 @@ function parseResendResponseBody(raw: string) {
   } catch {
     return raw || null;
   }
-}
-
-function shouldRetryWithFallbackSender(
-  status: number,
-  body: unknown,
-  currentFrom: string
-) {
-  if (currentFrom.toLowerCase() === FALLBACK_FROM_EMAIL) return false;
-  if (status < 400 || status >= 500) return false;
-
-  const text = typeof body === "string" ? body : JSON.stringify(body || {});
-  const normalized = text.toLowerCase();
-
-  return (
-    normalized.includes("from") ||
-    normalized.includes("sender") ||
-    normalized.includes("domain") ||
-    normalized.includes("verify") ||
-    normalized.includes("testing emails")
-  );
 }
 
 async function sendViaResend(args: {
@@ -142,6 +128,14 @@ async function sendViaResend(args: {
   const parsed = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
   const id = typeof parsed?.id === "string" ? parsed.id : undefined;
 
+  console.log("[email] resend response", {
+    status: response.status,
+    body,
+    to: args.to,
+    from: args.from,
+    subject: args.subject,
+  });
+
   if (args.debug) {
     console.log("[EMAIL_DEBUG] response", {
       status: response.status,
@@ -160,7 +154,7 @@ async function sendViaResend(args: {
 }
 
 export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<SendEmailResult> {
-  const { apiKey, configuredFrom, from } = getResendConfig();
+  const { apiKey, from } = getResendConfig();
   if (!apiKey) {
     throw new Error("Missing RESEND_API_KEY.");
   }
@@ -182,48 +176,6 @@ export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<
 
   if (primary.ok) {
     return { status: primary.status, id: primary.id };
-  }
-
-  if (shouldRetryWithFallbackSender(primary.status, primary.body, from)) {
-    console.warn("[email] resend sender rejected, retrying with fallback sender", {
-      from,
-      fallback: FALLBACK_FROM_EMAIL,
-      status: primary.status,
-      body: primary.body,
-    });
-
-    const retry = await sendViaResend({
-      apiKey,
-      from: FALLBACK_FROM_EMAIL,
-      to,
-      subject,
-      html,
-      text,
-      debug,
-    });
-
-    if (retry.ok) {
-      return { status: retry.status, id: retry.id };
-    }
-
-    console.error("[email] resend request failed after fallback retry", {
-      initial_from: from,
-      configured_from: configuredFrom || "(empty)",
-      retry_from: FALLBACK_FROM_EMAIL,
-      status: retry.status,
-      body: retry.body,
-      to,
-      subject,
-    });
-
-    throw new ResendRequestError({
-      message: retry.message,
-      status: retry.status,
-      body: retry.body,
-      to,
-      from: FALLBACK_FROM_EMAIL,
-      subject,
-    });
   }
 
   console.error("[email] resend request failed", {
