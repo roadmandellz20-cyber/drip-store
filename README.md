@@ -22,6 +22,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 ADMIN_ORDER_EMAIL=
+ALLOW_CUSTOMER_EMAILS=false
 EMAIL_DEBUG=false
 ```
 
@@ -32,6 +33,7 @@ EMAIL_DEBUG=false
 - Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
 - Recommended format: `orders@yourdomain.com`.
 - If `RESEND_FROM_EMAIL` is empty or uses common consumer domains (for example `gmail.com`), the app falls back to `onboarding@resend.dev` to keep checkout email flow testable.
+- In fallback mode (`onboarding@resend.dev`), only the admin order email is sent by default. Set `ALLOW_CUSTOMER_EMAILS=true` to also attempt customer emails.
 
 ## Checkout Order Flow
 

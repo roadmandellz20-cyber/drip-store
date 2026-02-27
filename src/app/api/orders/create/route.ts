@@ -9,6 +9,20 @@ import { ResendRequestError, sendEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
 
+const FALLBACK_FROM_EMAIL = "onboarding@resend.dev";
+const CONSUMER_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "icloud.com",
+  "proton.me",
+  "protonmail.com",
+  "aol.com",
+]);
+
 type IncomingItem = {
   id?: string;
   productId?: string;
@@ -60,6 +74,29 @@ function asNumber(value: unknown) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
+}
+
+function asBooleanFlag(value: unknown) {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function getSenderPolicy() {
+  const configuredFrom = asString(process.env.RESEND_FROM_EMAIL);
+  const normalizedFrom = configuredFrom.toLowerCase();
+  const fromDomain = configuredFrom.split("@")[1]?.toLowerCase() || "";
+  const containsGmail = normalizedFrom.includes("gmail.com");
+  const usesConsumerDomain = CONSUMER_EMAIL_DOMAINS.has(fromDomain);
+  const usesFallbackFrom = !configuredFrom || containsGmail || usesConsumerDomain;
+  const allowCustomerEmails = asBooleanFlag(process.env.ALLOW_CUSTOMER_EMAILS);
+
+  return {
+    configuredFrom,
+    from: usesFallbackFrom ? FALLBACK_FROM_EMAIL : configuredFrom,
+    usesFallbackFrom,
+    allowCustomerEmails,
+  };
 }
 
 function normalizePriceCents(row: Record<string, unknown>) {
@@ -206,7 +243,10 @@ async function sendOrderEmails(params: {
 
   const customerEmail = asString(params.shipping.email);
   const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
-  const forcedRecipient = adminEmail;
+  const senderPolicy = getSenderPolicy();
+  const shouldSendCustomer =
+    Boolean(customerEmail) &&
+    (!senderPolicy.usesFallbackFrom || senderPolicy.allowCustomerEmails);
 
   const emailItems: EmailOrderItem[] = params.lines.map((line) => ({
     title: line.title,
@@ -229,25 +269,32 @@ async function sendOrderEmails(params: {
     items: emailItems,
   };
 
-  if (!forcedRecipient) {
-    const message = "ADMIN_ORDER_EMAIL is empty; skipping all order emails.";
-    result.errors.push(message);
-    console.error(`[orders/create] ${message}`);
-    return result;
+  console.log("[orders/create] email_policy", {
+    uses_fallback_from: senderPolicy.usesFallbackFrom,
+    effective_from: senderPolicy.from,
+    allow_customer_emails: senderPolicy.allowCustomerEmails,
+    has_customer_email: Boolean(customerEmail),
+    has_admin_order_email: Boolean(adminEmail),
+  });
+
+  if (customerEmail && !shouldSendCustomer) {
+    console.log(
+      `[orders/create] customer email skipped: fallback sender active (${senderPolicy.from}) and ALLOW_CUSTOMER_EMAILS is false`
+    );
   }
 
-  if (customerEmail) {
+  if (shouldSendCustomer) {
     try {
       const customerTemplate = customerOrderEmail(payload);
       const customerResult = await sendEmail({
-        to: forcedRecipient,
+        to: customerEmail,
         subject: customerTemplate.subject,
         html: customerTemplate.html,
         text: customerTemplate.text,
       });
       result.customer = "sent";
       console.log(
-        `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"} routed_to=${forcedRecipient}`
+        `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"} to=${customerEmail}`
       );
     } catch (error) {
       result.customer = "failed";
@@ -266,17 +313,24 @@ async function sendOrderEmails(params: {
     }
   }
 
+  if (!adminEmail) {
+    const message = "ADMIN_ORDER_EMAIL is empty; skipping admin order email.";
+    result.errors.push(message);
+    console.error(`[orders/create] ${message}`);
+    return result;
+  }
+
   try {
     const adminTemplate = adminOrderEmail(payload);
     const adminResult = await sendEmail({
-      to: forcedRecipient,
+      to: adminEmail,
       subject: adminTemplate.subject,
       html: adminTemplate.html,
       text: adminTemplate.text,
     });
     result.admin = "sent";
     console.log(
-      `[orders/create] resend admin status=${adminResult.status} id=${adminResult.id || "n/a"} routed_to=${forcedRecipient}`
+      `[orders/create] resend admin status=${adminResult.status} id=${adminResult.id || "n/a"} to=${adminEmail}`
     );
   } catch (error) {
     result.admin = "failed";
@@ -303,6 +357,7 @@ export async function POST(request: Request) {
       has_resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
       has_resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
       has_admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
+      has_allow_customer_emails: Boolean(asString(process.env.ALLOW_CUSTOMER_EMAILS)),
     });
 
     const body = (await request.json()) as {
@@ -478,16 +533,33 @@ export async function POST(request: Request) {
       resend_api_key: !!process.env.RESEND_API_KEY,
       resend_from_email: !!process.env.RESEND_FROM_EMAIL,
       admin_order_email: !!process.env.ADMIN_ORDER_EMAIL,
+      allow_customer_emails: !!process.env.ALLOW_CUSTOMER_EMAILS,
     });
 
-    const emailResult = await sendOrderEmails({
-      orderNumber: orderRef,
-      shipping,
-      shippingAddress,
-      currency,
-      totalCents,
-      lines,
-    });
+    let emailResult: Awaited<ReturnType<typeof sendOrderEmails>> = {
+      customer: "skipped",
+      admin: "skipped",
+      errors: [],
+    };
+
+    try {
+      emailResult = await sendOrderEmails({
+        orderNumber: orderRef,
+        shipping,
+        shippingAddress,
+        currency,
+        totalCents,
+        lines,
+      });
+    } catch (error) {
+      const message = errorMessage(error);
+      emailResult = {
+        customer: "failed",
+        admin: "failed",
+        errors: [`unexpected_email_error: ${message}`],
+      };
+      console.error(`[orders/create] unexpected email pipeline error=${message}`);
+    }
 
     const emailAdminSent = emailResult.admin === "sent";
     const emailCustomerSent = emailResult.customer === "sent";
