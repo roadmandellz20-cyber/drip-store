@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 function makeRef(orderId: string) {
   const token = orderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
@@ -12,11 +12,16 @@ function subscribeNoop() {
   return () => {};
 }
 
-export default function SuccessClient() {
-  const router = useRouter();
-  const params = useSearchParams();
+type SuccessClientProps = {
+  initialOrderId: string;
+  initialOrderRef: string;
+};
 
-  const urlOrderId = (params.get("order_id") || "").trim();
+export default function SuccessClient({
+  initialOrderId,
+  initialOrderRef,
+}: SuccessClientProps) {
+  const router = useRouter();
   const hydrated = useSyncExternalStore(
     subscribeNoop,
     () => true,
@@ -34,19 +39,24 @@ export default function SuccessClient() {
     () => ""
   );
 
-  const orderId = urlOrderId || lastOrderId;
-  const canShowMissingState = Boolean(urlOrderId) || hydrated;
+  const orderId = initialOrderId || lastOrderId;
+  const canShowMissingState = Boolean(initialOrderId) || hydrated;
 
   useEffect(() => {
-    if (!urlOrderId) return;
+    if (!initialOrderId) return;
     try {
-      localStorage.setItem("last_order_id", urlOrderId);
+      localStorage.setItem("last_order_id", initialOrderId);
     } catch {
       // Ignore localStorage write failures.
     }
-  }, [urlOrderId]);
+  }, [initialOrderId]);
 
-  const orderRef = useMemo(() => (orderId ? makeRef(orderId) : ""), [orderId]);
+  const orderRef = useMemo(() => {
+    if (initialOrderId && orderId === initialOrderId && initialOrderRef) {
+      return initialOrderRef;
+    }
+    return orderId ? makeRef(orderId) : "";
+  }, [initialOrderId, initialOrderRef, orderId]);
 
   return (
     <div className="page">

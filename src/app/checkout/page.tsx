@@ -112,8 +112,10 @@ export default function CheckoutPage() {
       });
 
       const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
         error?: string;
         order_id?: string | null;
+        order_ref?: string | null;
         warning?: string;
         email_admin_sent?: boolean | null;
         email_customer_sent?: boolean | null;
@@ -121,13 +123,18 @@ export default function CheckoutPage() {
       };
       console.log("order create response", data);
 
-      if (!response.ok) {
+      if (!response.ok || data.ok !== true) {
         throw new Error(data.error || "Failed to place order.");
       }
 
       const orderId = typeof data.order_id === "string" ? data.order_id.trim() : "";
+      const orderRef = typeof data.order_ref === "string" ? data.order_ref.trim() : "";
       if (!orderId) {
         setError("Order was created but no order reference was returned. Please try again.");
+        return;
+      }
+      if (!orderRef) {
+        setError("Order was created but order_ref is missing. Please try again.");
         return;
       }
 
@@ -143,7 +150,9 @@ export default function CheckoutPage() {
 
       succeeded = true;
       clearCart();
-      router.push(`/success?order_id=${encodeURIComponent(orderId)}`);
+      router.push(
+        `/success?order_id=${encodeURIComponent(orderId)}&order_ref=${encodeURIComponent(orderRef)}`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
     } finally {

@@ -9,20 +9,6 @@ import { ResendRequestError, sendEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
 
-const FALLBACK_FROM_EMAIL = "onboarding@resend.dev";
-const CONSUMER_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "yahoo.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "icloud.com",
-  "proton.me",
-  "protonmail.com",
-  "aol.com",
-]);
-
 type IncomingItem = {
   id?: string;
   productId?: string;
@@ -80,23 +66,6 @@ function asBooleanFlag(value: unknown) {
   if (typeof value !== "string") return false;
   const normalized = value.trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-}
-
-function getSenderPolicy() {
-  const configuredFrom = asString(process.env.RESEND_FROM_EMAIL);
-  const normalizedFrom = configuredFrom.toLowerCase();
-  const fromDomain = configuredFrom.split("@")[1]?.toLowerCase() || "";
-  const containsGmail = normalizedFrom.includes("gmail.com");
-  const usesConsumerDomain = CONSUMER_EMAIL_DOMAINS.has(fromDomain);
-  const usesFallbackFrom = !configuredFrom || containsGmail || usesConsumerDomain;
-  const allowCustomerEmails = asBooleanFlag(process.env.ALLOW_CUSTOMER_EMAILS);
-
-  return {
-    configuredFrom,
-    from: usesFallbackFrom ? FALLBACK_FROM_EMAIL : configuredFrom,
-    usesFallbackFrom,
-    allowCustomerEmails,
-  };
 }
 
 function normalizePriceCents(row: Record<string, unknown>) {
@@ -238,15 +207,20 @@ async function sendOrderEmails(params: {
   const result = {
     customer: "skipped" as "sent" | "failed" | "skipped",
     admin: "skipped" as "sent" | "failed" | "skipped",
+    customerSkippedByPolicy: false,
     errors: [] as string[],
   };
 
   const customerEmail = asString(params.shipping.email);
   const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
-  const senderPolicy = getSenderPolicy();
+  const resendDomainVerified = asBooleanFlag(process.env.RESEND_DOMAIN_VERIFIED);
+  // In Resend test mode, you can only send to your own email until domain verification is complete.
+  const customerAllowedInTestMode =
+    !!customerEmail &&
+    !!adminEmail &&
+    customerEmail.toLowerCase() === adminEmail.toLowerCase();
   const shouldSendCustomer =
-    Boolean(customerEmail) &&
-    (!senderPolicy.usesFallbackFrom || senderPolicy.allowCustomerEmails);
+    !!customerEmail && (resendDomainVerified || customerAllowedInTestMode);
 
   const emailItems: EmailOrderItem[] = params.lines.map((line) => ({
     title: line.title,
@@ -270,16 +244,15 @@ async function sendOrderEmails(params: {
   };
 
   console.log("[orders/create] email_policy", {
-    uses_fallback_from: senderPolicy.usesFallbackFrom,
-    effective_from: senderPolicy.from,
-    allow_customer_emails: senderPolicy.allowCustomerEmails,
+    resend_domain_verified: resendDomainVerified,
     has_customer_email: Boolean(customerEmail),
     has_admin_order_email: Boolean(adminEmail),
   });
 
   if (customerEmail && !shouldSendCustomer) {
+    result.customerSkippedByPolicy = true;
     console.log(
-      `[orders/create] customer email skipped: fallback sender active (${senderPolicy.from}) and ALLOW_CUSTOMER_EMAILS is false`
+      "[orders/create] customer email skipped: domain not verified and recipient is not admin email (Resend test-mode restriction)"
     );
   }
 
@@ -357,7 +330,7 @@ export async function POST(request: Request) {
       has_resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
       has_resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
       has_admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
-      has_allow_customer_emails: Boolean(asString(process.env.ALLOW_CUSTOMER_EMAILS)),
+      has_resend_domain_verified: Boolean(asString(process.env.RESEND_DOMAIN_VERIFIED)),
     });
 
     const body = (await request.json()) as {
@@ -405,6 +378,7 @@ export async function POST(request: Request) {
           reused: true,
           order_id: existingId,
           order_ref: makeOrderRef(existingId),
+          email_status: asString(existingOrder.email_status) || null,
           email_admin_sent: null,
           email_customer_sent: null,
           email_error: asString(existingOrder.email_error) || null,
@@ -495,6 +469,7 @@ export async function POST(request: Request) {
             reused: true,
             order_id: duplicateId,
             order_ref: makeOrderRef(duplicateId),
+            email_status: asString(duplicate.email_status) || null,
             email_admin_sent: null,
             email_customer_sent: null,
             email_error: asString(duplicate.email_error) || null,
@@ -533,12 +508,13 @@ export async function POST(request: Request) {
       resend_api_key: !!process.env.RESEND_API_KEY,
       resend_from_email: !!process.env.RESEND_FROM_EMAIL,
       admin_order_email: !!process.env.ADMIN_ORDER_EMAIL,
-      allow_customer_emails: !!process.env.ALLOW_CUSTOMER_EMAILS,
+      resend_domain_verified: !!process.env.RESEND_DOMAIN_VERIFIED,
     });
 
     let emailResult: Awaited<ReturnType<typeof sendOrderEmails>> = {
       customer: "skipped",
       admin: "skipped",
+      customerSkippedByPolicy: false,
       errors: [],
     };
 
@@ -556,6 +532,7 @@ export async function POST(request: Request) {
       emailResult = {
         customer: "failed",
         admin: "failed",
+        customerSkippedByPolicy: false,
         errors: [`unexpected_email_error: ${message}`],
       };
       console.error(`[orders/create] unexpected email pipeline error=${message}`);
@@ -564,11 +541,13 @@ export async function POST(request: Request) {
     const emailAdminSent = emailResult.admin === "sent";
     const emailCustomerSent = emailResult.customer === "sent";
     const derivedEmailStatus =
-      emailResult.errors.length === 0
-        ? "sent"
-        : emailCustomerSent || emailAdminSent
-          ? "partial"
-          : "failed";
+      emailAdminSent && emailResult.customerSkippedByPolicy
+        ? "admin_sent_customer_skipped"
+        : emailResult.errors.length === 0
+          ? "sent"
+          : emailCustomerSent || emailAdminSent
+            ? "partial"
+            : "failed";
     const emailError = emailResult.errors.length ? emailResult.errors.join(" | ") : null;
     const warning = emailError
       ? "Order was created but one or more emails failed to send."
@@ -597,6 +576,7 @@ export async function POST(request: Request) {
       ok: true,
       order_id: orderId,
       order_ref: orderRef,
+      email_status: derivedEmailStatus,
       email_admin_sent: emailAdminSent,
       email_customer_sent: emailCustomerSent,
       email_error: emailError,
