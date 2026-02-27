@@ -37,6 +37,8 @@ export class ResendRequestError extends Error {
   }
 }
 
+const VERIFIED_FROM = "Mugen District <orders@mugendistrict.com>";
+
 function isEmailDebugEnabled() {
   const value = (process.env.EMAIL_DEBUG || "").trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
@@ -44,19 +46,7 @@ function isEmailDebugEnabled() {
 
 function getResendConfig() {
   const apiKey = (process.env.RESEND_API_KEY || "").trim();
-  const configuredFrom = (process.env.RESEND_FROM_EMAIL || "").trim();
-  const configuredFromName = (process.env.RESEND_FROM_NAME || "").trim() || "Mugen District";
-
-  if (!configuredFrom) {
-    throw new Error(
-      "Missing RESEND_FROM_EMAIL. Use a verified sender (for example: no-reply@yourdomain.com)."
-    );
-  }
-
-  const hasFromEnvelope = configuredFrom.includes("<") && configuredFrom.includes(">");
-  const from = hasFromEnvelope ? configuredFrom : `${configuredFromName} <${configuredFrom}>`;
-
-  return { apiKey, from };
+  return { apiKey, from: VERIFIED_FROM };
 }
 
 function messageFromResendBody(body: unknown, status: number) {

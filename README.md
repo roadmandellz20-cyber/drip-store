@@ -32,8 +32,8 @@ EMAIL_DEBUG=false
 `RESEND_FROM_EMAIL` must be a verified sender/domain in Resend.
 
 - Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
-- Recommended format: `no-reply@yourdomain.com`.
-- The app sends using `Mugen District <no-reply@yourdomain.com>` (customizable via `RESEND_FROM_NAME`).
+- Required sender: `Mugen District <orders@mugendistrict.com>`.
+- Do not use `onboarding@resend.dev` in production.
 - Customer emails are attempted only when `RESEND_DOMAIN_VERIFIED=true`.
 - Admin order emails are always attempted to `ADMIN_ORDER_EMAIL`.
 
