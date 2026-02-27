@@ -580,6 +580,30 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 }
 .btn--cop:hover{border-color:rgba(255,255,255,.42)}
 
+.back-home-arrow{
+  position:fixed;
+  left:18px;
+  top:calc(var(--header-height) + 4px);
+  z-index:10005;
+  min-width:72px;
+  height:32px;
+  padding:0 10px;
+  justify-content:center;
+  font-size:11px;
+  font-weight:800;
+  gap:6px;
+  line-height:1;
+  letter-spacing:.08em;
+  background:rgba(0,0,0,.55);
+  border-color:rgba(255,255,255,.7);
+  backdrop-filter:blur(8px);
+  box-shadow:0 4px 12px rgba(0,0,0,.35);
+}
+.back-home-arrow:hover{
+  border-color:#fff;
+  box-shadow:2px 0 #ff0000, -2px 0 #00e5ff;
+}
+
 .btn-glitch{animation:btnGlitch .2s steps(2,end) both}
 .btn--primary.btn-glitch{
   animation:btnGlitchPrimary .24s steps(2,end) both;
@@ -678,6 +702,14 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 @media (max-width: 620px){
   .grid{grid-template-columns:1fr}
   .hero{min-height:76vh}
+  .back-home-arrow{
+    left:18px;
+    top:calc(var(--header-height) + 3px);
+    min-width:66px;
+    height:30px;
+    padding:0 8px;
+    font-size:10px;
+  }
 }
 
 .p-card{
