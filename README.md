@@ -21,6 +21,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+RESEND_FROM_NAME=Mugen District
 ADMIN_ORDER_EMAIL=
 RESEND_DOMAIN_VERIFIED=false
 EMAIL_DEBUG=false
@@ -31,11 +32,32 @@ EMAIL_DEBUG=false
 `RESEND_FROM_EMAIL` must be a verified sender/domain in Resend.
 
 - Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
-- Recommended format: `orders@yourdomain.com`.
-- If `RESEND_FROM_EMAIL` is empty or uses common consumer domains (for example `gmail.com`), the app falls back to `onboarding@resend.dev` to keep checkout email flow testable.
-- Until your domain is verified, set `RESEND_FROM_EMAIL=onboarding@resend.dev` in local and Vercel env.
+- Recommended format: `no-reply@yourdomain.com`.
+- The app sends using `Mugen District <no-reply@yourdomain.com>` (customizable via `RESEND_FROM_NAME`).
 - Customer emails are attempted only when `RESEND_DOMAIN_VERIFIED=true`.
 - Admin order emails are always attempted to `ADMIN_ORDER_EMAIL`.
+
+## DNS Separation (Vercel + Resend)
+
+Keep website DNS and email DNS separate to avoid SSL or delivery regressions.
+
+- Website (Vercel): keep `A @ -> <Vercel IP from Vercel Domains panel>` and `CNAME www -> <Vercel CNAME from Vercel Domains panel>`.
+- Do not add extra conflicting `A`/`CNAME` records for `@` or `www`.
+- Resend email DNS:
+  - `TXT resend._domainkey = p=...` (DKIM)
+  - `TXT send = v=spf1 include:amazonses.com ~all` (SPF)
+  - `MX send = feedback-smtp.eu-west-1.amazonses.com` (priority `10`)
+  - `TXT _dmarc = v=DMARC1; p=none;`
+- If an `MX` was accidentally created as `TXT`, delete and recreate it as `MX`.
+
+## Delivery Validation Checklist
+
+- Send test email to Gmail and Outlook.
+- Verify it does not consistently land in spam.
+- Check raw headers for `SPF=pass` and `DKIM=pass`.
+- Confirm `From` is your branded domain and no unexpected `via resend` style aliasing is shown.
+- Confirm Resend response IDs are present in Vercel logs.
+- Add Resend webhooks for bounces/complaints in a follow-up iteration.
 
 ## Checkout Order Flow
 

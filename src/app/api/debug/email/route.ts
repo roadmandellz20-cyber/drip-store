@@ -2,21 +2,19 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const FALLBACK_FROM_EMAIL = "onboarding@resend.dev";
-
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function pickDebugSender() {
+function getDebugSender() {
   const configuredFrom = asString(process.env.RESEND_FROM_EMAIL);
-  const normalized = configuredFrom.toLowerCase();
-
-  if (!configuredFrom || normalized.includes("gmail.com")) {
-    return FALLBACK_FROM_EMAIL;
+  if (!configuredFrom) {
+    throw new Error("Missing RESEND_FROM_EMAIL.");
   }
 
-  return configuredFrom;
+  const configuredFromName = asString(process.env.RESEND_FROM_NAME) || "Mugen District";
+  const hasFromEnvelope = configuredFrom.includes("<") && configuredFrom.includes(">");
+  return hasFromEnvelope ? configuredFrom : `${configuredFromName} <${configuredFrom}>`;
 }
 
 function parseResendResponseBody(raw: string) {
@@ -53,7 +51,18 @@ async function sendDebugEmail(toOverride: string) {
     );
   }
 
-  const from = pickDebugSender();
+  let from = "";
+  try {
+    from = getDebugSender();
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Invalid RESEND_FROM_EMAIL",
+      },
+      { status: 500 }
+    );
+  }
   const subject = `Resend debug test ${new Date().toISOString()}`;
   const text = "Resend debug endpoint test email.";
   const html = "<p>Resend debug endpoint test email.</p>";

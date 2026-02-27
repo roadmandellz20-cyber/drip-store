@@ -37,47 +37,26 @@ export class ResendRequestError extends Error {
   }
 }
 
-const FALLBACK_FROM_EMAIL = "onboarding@resend.dev";
-const CONSUMER_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "yahoo.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "icloud.com",
-  "proton.me",
-  "protonmail.com",
-  "aol.com",
-]);
-
 function isEmailDebugEnabled() {
   const value = (process.env.EMAIL_DEBUG || "").trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes" || value === "on";
 }
 
 function getResendConfig() {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = (process.env.RESEND_API_KEY || "").trim();
   const configuredFrom = (process.env.RESEND_FROM_EMAIL || "").trim();
-  const normalizedFrom = configuredFrom.toLowerCase();
-  const fromDomain = configuredFrom.split("@")[1]?.toLowerCase() || "";
-  const containsGmail = normalizedFrom.includes("gmail.com");
-  const shouldFallback =
-    !configuredFrom || containsGmail || CONSUMER_EMAIL_DOMAINS.has(fromDomain);
+  const configuredFromName = (process.env.RESEND_FROM_NAME || "").trim() || "Mugen District";
 
-  const from = shouldFallback ? FALLBACK_FROM_EMAIL : configuredFrom;
-
-  if (containsGmail && configuredFrom) {
-    console.warn(
-      `[email] RESEND_FROM_EMAIL (${configuredFrom}) contains gmail.com. Temporarily forcing ${FALLBACK_FROM_EMAIL}.`
-    );
-  } else if (shouldFallback && configuredFrom) {
-    console.warn(
-      `[email] RESEND_FROM_EMAIL (${configuredFrom}) may be unverified. Falling back to ${FALLBACK_FROM_EMAIL}.`
+  if (!configuredFrom) {
+    throw new Error(
+      "Missing RESEND_FROM_EMAIL. Use a verified sender (for example: no-reply@yourdomain.com)."
     );
   }
 
-  return { apiKey, configuredFrom, from };
+  const hasFromEnvelope = configuredFrom.includes("<") && configuredFrom.includes(">");
+  const from = hasFromEnvelope ? configuredFrom : `${configuredFromName} <${configuredFrom}>`;
+
+  return { apiKey, from };
 }
 
 function messageFromResendBody(body: unknown, status: number) {
@@ -130,6 +109,7 @@ async function sendViaResend(args: {
 
   console.log("[email] resend response", {
     status: response.status,
+    id,
     body,
     to: args.to,
     from: args.from,
