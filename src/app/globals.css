@@ -300,8 +300,8 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   .nav{display:none}
   .menu-toggle{display:inline-flex}
   .brand__name{font-size:9.6px}
-  .brand__jp{font-size:8px; opacity:.55}
-  .brand{gap:6px}
+  .brand__jp{font-size:8px; opacity:.55; margin-left:-2px}
+  .brand{gap:1px}
   .nav-right{gap:10px}
   .icon-link--navbox{
     width:auto;
@@ -329,12 +329,14 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   }
 
   .site-header{padding:0 12px}
+  .brand{max-width:140px}
 
   .hero__title{
-    font-size:clamp(2.5rem, 12vw, 6rem);
-    width:90vw;
-    max-width:90vw;
-    line-height:1.02;
+    font-size:clamp(2.2rem, 11vw, 8rem);
+    width:100%;
+    max-width:95vw;
+    margin:0 auto;
+    line-height:.86;
     letter-spacing:.03em;
   }
   .hero__sub{max-width:90vw}
@@ -425,6 +427,8 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   min-height:72vh;
   border-bottom:1px solid var(--line);
   overflow:hidden;
+  overflow-x:hidden;
+  width:100vw;
   background:#050505;
 }
 .hero__bg{
@@ -467,11 +471,13 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   text-transform:uppercase;
   letter-spacing:.05em;
   font-weight:800;
-  margin:0;
-  line-height:.9;
-  font-size:clamp(4rem, 10vw, 10rem);
+  margin:0 auto;
+  line-height:.86;
+  font-size:clamp(2.2rem, 11vw, 8rem);
   position:relative;
-  display:inline-block;
+  display:block;
+  width:100%;
+  max-width:95vw;
 }
 .hero__title span{color:var(--red)}
 /* Subtle Spider-Verse camera glitch (NOT too much) */
