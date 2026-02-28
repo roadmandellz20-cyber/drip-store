@@ -12,6 +12,7 @@ import {
   removeFromCart,
   type CartItem,
 } from "@/lib/cart";
+import { createOrderSuccessSummary, writeOrderSuccessSummary } from "@/lib/order-success";
 
 type ShippingForm = {
   name: string;
@@ -149,6 +150,16 @@ export default function CheckoutPage() {
       }
 
       succeeded = true;
+      writeOrderSuccessSummary(
+        createOrderSuccessSummary({
+          orderId,
+          orderRef,
+          currency: "GMD",
+          total,
+          shipping,
+          items,
+        })
+      );
       clearCart();
       router.push(
         `/success?order_id=${encodeURIComponent(orderId)}&order_ref=${encodeURIComponent(orderRef)}`

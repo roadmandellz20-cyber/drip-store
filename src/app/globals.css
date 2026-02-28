@@ -479,6 +479,13 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 /* ===== Pages ===== */
 .page{max-width:1200px; margin:0 auto; padding:30px 16px 80px}
 .page__head{margin-bottom:18px}
+.page__kicker{
+  margin-bottom:12px;
+  color:rgba(255,255,255,.72);
+  font-size:12px;
+  letter-spacing:.28em;
+  text-transform:uppercase;
+}
 .page__title{
   font-family:var(--head);
   text-transform:uppercase;
@@ -652,6 +659,20 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   border-color:#fff;
 }
 .btn--ghost:hover{border-color:rgba(255,255,255,.75)}
+.btn--secondary{
+  background:rgba(255,255,255,.06);
+  color:#fff;
+  border-color:rgba(255,255,255,.38);
+}
+.btn--secondary:hover{
+  border-color:#fff;
+  background:rgba(255,255,255,.1);
+}
+.btn__hint{
+  font-size:11px;
+  letter-spacing:.1em;
+  opacity:.68;
+}
 .btn--cop{
   padding:10px 12px;
   background:transparent;
@@ -1256,33 +1277,144 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   gap:10px;
 }
 
-.success-panel{
-  max-width:720px;
+.page--flash{
+  animation:pageFlash .16s steps(2,end);
 }
-.success-panel__row{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:12px;
-  font-size:13px;
-  letter-spacing:.08em;
+.glitch{
+  position:relative;
+  display:inline-block;
 }
-.success-panel__row strong{
-  font-size:14px;
-  letter-spacing:.04em;
-  text-align:right;
+.glitch::before,
+.glitch::after{
+  content:attr(data-text);
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  opacity:.55;
 }
-.success-panel__items{
-  display:grid;
-  gap:10px;
+.glitch::before{
+  transform:translate(2px,0);
+  color:transparent;
+  text-shadow:2px 0 var(--red);
+  clip-path:inset(0 0 55% 0);
+  animation:sv 4.2s infinite steps(12,end);
 }
-.success-panel__item{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
+.glitch::after{
+  transform:translate(-2px,0);
+  color:transparent;
+  text-shadow:-2px 0 cyan;
+  clip-path:inset(45% 0 0 0);
+  animation:sv2 5.4s infinite steps(12,end);
+}
+.panel{
+  position:relative;
+  max-width:760px;
   border:1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+    rgba(0,0,0,.42);
+  overflow:hidden;
+}
+.panel__line{
+  height:2px;
+  background:linear-gradient(90deg, var(--red), rgba(255,255,255,.55), transparent);
+}
+.panel__body{
+  padding:18px;
+  display:grid;
+  gap:16px;
+}
+.mono{
+  font-family:var(--mono);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.mono--big{
+  font-size:14px;
+}
+.mono__strong{
+  font-size:clamp(1rem, 3vw, 1.35rem);
+  letter-spacing:.14em;
+}
+.muted{
+  color:var(--muted);
+}
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+}
+.btn--mobile{
+  display:none;
+}
+.mini{
+  display:grid;
+  gap:6px;
+  padding-top:4px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.mini__label{
+  font-size:12px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.6);
+}
+.mini__text{
+  line-height:1.6;
+}
+.footerlinks{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:18px;
+  flex-wrap:wrap;
+}
+.footerlinks__a{
+  color:#fff;
+  text-decoration:none;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  font-size:12px;
+}
+.footerlinks__a:hover{
+  text-shadow:2px 0 #ff0000, -2px 0 #00e5ff;
+}
+.footerlinks__sep{
+  color:rgba(255,255,255,.42);
+}
+.rawmsg{
+  margin:22px 0 0;
+  max-width:760px;
+  padding:14px 16px;
+  border:1px dashed rgba(255,255,255,.18);
   background:rgba(255,255,255,.02);
-  padding:10px;
+  color:rgba(255,255,255,.58);
+  font-family:var(--mono);
+  font-size:11px;
+  line-height:1.6;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+
+@keyframes pageFlash{
+  0%{filter:none}
+  50%{filter:contrast(1.18) saturate(1.1)}
+  100%{filter:none}
+}
+
+@media (max-width: 700px){
+  .actions{
+    flex-direction:column;
+  }
+
+  .actions .btn{
+    width:100%;
+    justify-content:space-between;
+  }
+
+  .btn--mobile{
+    display:inline-flex;
+  }
 }
 
 /* Toast */

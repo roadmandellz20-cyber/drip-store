@@ -13,7 +13,11 @@ type SuccessPageProps = {
 };
 
 function pickParam(value: string | string[] | undefined) {
-  return typeof value === "string" ? value.trim() : Array.isArray(value) ? value[0]?.trim() || "" : "";
+  return typeof value === "string"
+    ? value.trim()
+    : Array.isArray(value)
+      ? value[0]?.trim() || ""
+      : "";
 }
 
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
@@ -26,8 +30,21 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
       fallback={
         <div className="page">
           <div className="page__head">
-            <h1 className="page__title">ORDER RECEIVED</h1>
-            <p className="page__sub">Loading order reference...</p>
+            <div className="page__kicker">MUGEN DISTRICT</div>
+            <h1 className="page__title">ORDER ARCHIVED</h1>
+            <p className="page__sub">
+              Logging your entry into the archive…
+            </p>
+          </div>
+
+          <div className="panel">
+            <div className="panel__line" />
+            <div className="panel__body">
+              <div className="mono">REF: LOADING…</div>
+              <div className="muted">
+                Don’t close this page — we’re generating your confirmation options.
+              </div>
+            </div>
           </div>
         </div>
       }
