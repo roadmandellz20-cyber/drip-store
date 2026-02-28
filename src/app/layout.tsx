@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import FxLayer from "@/components/FxLayer";
 import BackHomeArrow from "@/components/BackHomeArrow";
 import ToastClient from "./toast.client";
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <BackHomeArrow />
         <main>{children}</main>
+        <Footer />
         <div id="toast" aria-live="polite" aria-atomic="true" />
         <ToastClient />
       </body>

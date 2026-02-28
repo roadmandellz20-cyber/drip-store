@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import SocialLinks from "@/components/SocialLinks";
 
 type Product = {
   code: string;
@@ -211,17 +212,7 @@ export default function ArchiveClient() {
           <div className="md-paperBlock">
             <div className="md-paperHead">MANIFESTO</div>
             <p>{"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}</p>
-            <div className="md-links md-links2">
-              <a href="#" aria-disabled="true">
-                Instagram
-              </a>
-              <a href="#" aria-disabled="true">
-                TikTok
-              </a>
-              <a href="#" aria-disabled="true">
-                X
-              </a>
-            </div>
+            <SocialLinks variant="footer" className="md-links2" />
             <p className="md-stamp">DISCARDED TOKYO NEWSPAPER • ISSUE 001</p>
           </div>
 

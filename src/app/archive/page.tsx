@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SocialLinks from "@/components/SocialLinks";
 import ProductGrid from "@/components/ProductGrid";
 import { ALL_PRODUCTS } from "@/lib/products";
 
@@ -68,11 +69,7 @@ export default function ArchivePage() {
           <div className="footer__card">
             <div className="footer__title">MANIFESTO</div>
             <p>{"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}</p>
-            <div className="footer__socials">
-              <a href="#">INSTAGRAM</a>
-              <a href="#">TIKTOK</a>
-              <a href="#">X</a>
-            </div>
+            <SocialLinks variant="footer" className="mt-4" />
             <div className="footer__small">DISCARDED TOKYO NEWSPAPER • ISSUE 001</div>
           </div>
 
