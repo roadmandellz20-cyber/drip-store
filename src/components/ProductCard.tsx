@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
+import { warmProductImage } from "@/lib/product-images";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -31,8 +33,10 @@ export default function ProductCard({
   priority?: boolean;
   launchLive: boolean;
 }) {
+  const router = useRouter();
   const [hover, setHover] = useState(false);
   const cardRef = useRef<HTMLElement | null>(null);
+  const warmedRef = useRef(false);
 
   const status = product.limited ? "LIMITED" : "AVAILABLE";
 
@@ -50,12 +54,24 @@ export default function ProductCard({
     triggerCardPulse(cardRef.current);
   };
 
+  const warmDetailAssets = () => {
+    if (warmedRef.current) return;
+    warmedRef.current = true;
+
+    router.prefetch(`/product/${product.id}`);
+    warmProductImage(product.imageFallbackUrl || product.imageUrl, 1600);
+    warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
+  };
+
   return (
     <article
       ref={cardRef}
       className={`p-card ${product.limited ? "p-card--limited" : "p-card--available"}`}
       style={{ transform: `rotate(${tilt}deg)` }}
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={() => {
+        setHover(true);
+        warmDetailAssets();
+      }}
       onMouseLeave={() => setHover(false)}
     >
       <div className="p-card__frame">
@@ -64,7 +80,13 @@ export default function ProductCard({
           <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
         </div>
 
-        <Link className="p-card__imgWrap" href={`/product/${product.id}`} aria-label={product.name}>
+        <Link
+          className="p-card__imgWrap"
+          href={`/product/${product.id}`}
+          aria-label={product.name}
+          onTouchStart={warmDetailAssets}
+          onFocus={warmDetailAssets}
+        >
           <ProductImage
             className={`p-card__img ${hover ? "is-hidden" : ""}`}
             src={product.imageUrl}
@@ -110,6 +132,8 @@ export default function ProductCard({
               className="p-card__view"
               href={`/product/${product.id}`}
               onClick={(e) => triggerButtonGlitch(e.currentTarget)}
+              onTouchStart={warmDetailAssets}
+              onFocus={warmDetailAssets}
             >
               view →
             </Link>
