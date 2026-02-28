@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductImage from "@/components/ProductImage";
+import { useLaunchLive } from "@/hooks/useLaunchLive";
 import {
   cartTotal,
   clearCart,
@@ -62,6 +64,7 @@ export default function CheckoutPage() {
   const [shipping, setShipping] = useState<ShippingForm>(INITIAL_SHIPPING);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const live = useLaunchLive();
 
   useEffect(() => {
     const sync = () => setItems(readCart());
@@ -82,6 +85,10 @@ export default function CheckoutPage() {
 
   async function onPlaceOrder() {
     if (submitting) return;
+    if (!live) {
+      setError("LOCKED — Opens April 1");
+      return;
+    }
 
     if (items.length === 0) {
       setError("Cart is empty.");
@@ -365,6 +372,8 @@ export default function CheckoutPage() {
               <span>GMD {total.toLocaleString()}</span>
             </div>
 
+            {!live ? <LaunchCountdown variant="inline" /> : null}
+
             <button
               className="btn btn--primary"
               onClick={(e) => {
@@ -372,9 +381,9 @@ export default function CheckoutPage() {
                 void onPlaceOrder();
               }}
               type="button"
-              disabled={submitting}
+              disabled={submitting || !live}
             >
-              {submitting ? "PROCESSING..." : "PLACE ORDER"}
+              {submitting ? "PROCESSING..." : live ? "PLACE ORDER" : "LOCKED — Opens April 1"}
             </button>
 
             {error ? <div className="checkout__error">{error}</div> : null}

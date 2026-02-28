@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LaunchCountdown from "@/components/LaunchCountdown";
 import SocialLinks from "@/components/SocialLinks";
 import ProductGrid from "@/components/ProductGrid";
 import { ALL_PRODUCTS } from "@/lib/products";
@@ -6,6 +7,8 @@ import { ALL_PRODUCTS } from "@/lib/products";
 export default function ArchivePage() {
   return (
     <div className="archive">
+      <LaunchCountdown />
+
       <section className="hero hero-container" id="hero-section" role="banner">
         <div className="hero__bg" />
         <div className="hero__shade" />

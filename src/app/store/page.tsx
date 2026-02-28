@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductGrid from "@/components/ProductGrid";
 import { ALL_PRODUCTS } from "@/lib/products";
 
@@ -15,6 +16,8 @@ export default function StorePage() {
 
   return (
     <div className="page">
+      <LaunchCountdown />
+
       <div className="page__head">
         <h1 className="page__title">ALL PRODUCTS</h1>
         <p className="page__sub">Everything in the district. No filler.</p>

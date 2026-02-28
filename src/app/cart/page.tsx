@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cartTotal, decQty, incQty, readCart, removeFromCart, type CartItem } from "@/lib/cart";
 import ProductImage from "@/components/ProductImage";
+import { useLaunchLive } from "@/hooks/useLaunchLive";
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
+  const live = useLaunchLive();
 
   useEffect(() => {
     const sync = () => setItems(readCart());
@@ -72,7 +74,15 @@ export default function CartPage() {
               <span>Total</span>
               <span>GMD {total.toLocaleString()}</span>
             </div>
-            <Link className="btn btn--primary" href="/checkout">GO TO CHECKOUT</Link>
+            {live ? (
+              <Link className="btn btn--primary" href="/checkout">
+                GO TO CHECKOUT
+              </Link>
+            ) : (
+              <button className="btn btn--primary" type="button" disabled>
+                LOCKED — Opens April 1
+              </button>
+            )}
             <Link className="btn btn--ghost" href="/archive">BACK TO ARCHIVE</Link>
           </div>
         </div>

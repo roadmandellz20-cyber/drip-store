@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { cartTotal, decQty, incQty, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+import { useLaunchLive } from "@/hooks/useLaunchLive";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -21,6 +22,7 @@ export default function CartDrawer({
   onClose: () => void;
 }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const live = useLaunchLive();
 
   useEffect(() => {
     const sync = () => setItems(readCart());
@@ -137,9 +139,15 @@ export default function CartDrawer({
             <span>Total</span>
             <span>GMD {total.toLocaleString()}</span>
           </div>
-          <Link className="btn btn--primary" href="/checkout" onClick={onClose}>
-            Proceed to Order →
-          </Link>
+          {live ? (
+            <Link className="btn btn--primary" href="/checkout" onClick={onClose}>
+              Proceed to Order →
+            </Link>
+          ) : (
+            <button className="btn btn--primary" type="button" disabled>
+              LOCKED — Opens April 1
+            </button>
+          )}
         </div>
       </div>
     </div>

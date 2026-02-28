@@ -25,9 +25,11 @@ function triggerCardPulse(el: HTMLElement | null) {
 export default function ProductCard({
   product,
   priority = false,
+  launchLive,
 }: {
   product: Product;
   priority?: boolean;
+  launchLive: boolean;
 }) {
   const [hover, setHover] = useState(false);
   const cardRef = useRef<HTMLElement | null>(null);
@@ -42,6 +44,7 @@ export default function ProductCard({
   }, [product.id]);
 
   const onCop = () => {
+    if (!launchLive) return;
     addToCart(product, "M", 1);
     window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
     triggerCardPulse(cardRef.current);
@@ -96,8 +99,9 @@ export default function ProductCard({
                 onCop();
               }}
               type="button"
+              disabled={!launchLive}
             >
-              COP
+              {launchLive ? "COP" : "LOCKED — Opens April 1"}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

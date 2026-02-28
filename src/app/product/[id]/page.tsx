@@ -6,11 +6,14 @@ import { getProduct } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
 import Link from "next/link";
 import ProductImage from "@/components/ProductImage";
+import LaunchCountdown from "@/components/LaunchCountdown";
+import { useLaunchLive } from "@/hooks/useLaunchLive";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const product = useMemo(() => getProduct(params.id), [params.id]);
   const [size, setSize] = useState<"S" | "M" | "L" | "XL">("M");
+  const live = useLaunchLive();
 
   if (!product) {
     return (
@@ -27,6 +30,7 @@ export default function ProductDetailPage() {
   }
 
   const onAdd = () => {
+    if (!live) return;
     addToCart(product, size, 1);
     window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
   };
@@ -76,12 +80,20 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="detail__actions">
-            <button className="btn btn--primary" onClick={onAdd}>
-              Add to Cart
+            {!live ? <LaunchCountdown variant="inline" /> : null}
+
+            <button className="btn btn--primary" onClick={onAdd} disabled={!live}>
+              {live ? "Add to Cart" : "LOCKED — Opens April 1"}
             </button>
-            <Link className="btn btn--ghost" href="/checkout">
-              Go to Checkout →
-            </Link>
+            {live ? (
+              <Link className="btn btn--ghost" href="/checkout">
+                Go to Checkout →
+              </Link>
+            ) : (
+              <button className="btn btn--ghost" type="button" disabled>
+                LOCKED — Opens April 1
+              </button>
+            )}
           </div>
 
           <div className="detail__list">
