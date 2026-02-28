@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cartTotal, decQty, incQty, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+import ProductImage from "@/components/ProductImage";
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -38,7 +39,14 @@ export default function CartPage() {
           <div className="checkout__list">
             {items.map((item) => (
               <div className="checkout__item" key={`${item.id}-${item.size}`}>
-                <img src={item.product.image} alt={item.product.name} loading="lazy" />
+                <ProductImage
+                  src={item.product.imageUrl}
+                  fallbackSrc={item.product.imageFallbackUrl}
+                  alt={item.product.name}
+                  width={100}
+                  height={100}
+                  sizes="100px"
+                />
                 <div className="checkout__meta">
                   <div className="checkout__sku">{item.product.sku}</div>
                   <div className="checkout__name">{item.product.name}</div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
+import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
   if (!el) return;
@@ -21,7 +22,13 @@ function triggerCardPulse(el: HTMLElement | null) {
   window.setTimeout(() => el.classList.remove("p-card--pulse"), 140);
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+  priority = false,
+}: {
+  product: Product;
+  priority?: boolean;
+}) {
   const [hover, setHover] = useState(false);
   const cardRef = useRef<HTMLElement | null>(null);
 
@@ -55,17 +62,22 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
 
         <Link className="p-card__imgWrap" href={`/product/${product.id}`} aria-label={product.name}>
-          <img
+          <ProductImage
             className={`p-card__img ${hover ? "is-hidden" : ""}`}
-            src={product.image}
+            src={product.imageUrl}
+            fallbackSrc={product.imageFallbackUrl}
             alt={product.name}
-            loading="lazy"
+            fill
+            priority={priority}
+            sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
           />
-          <img
+          <ProductImage
             className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
-            src={product.look}
+            src={product.lookImageUrl}
+            fallbackSrc={product.lookImageFallbackUrl}
             alt={`${product.name} lookbook`}
-            loading="lazy"
+            fill
+            sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
           />
 
           <div className="p-card__camglitch" aria-hidden="true" />

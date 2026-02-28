@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import ProductImage from "@/components/ProductImage";
 import SocialLinks from "@/components/SocialLinks";
 
 type Product = {
@@ -19,24 +20,24 @@ export default function ArchiveClient() {
         code: "LUFFY-01",
         title: "Luffy Chaos Print",
         status: "LIMITED",
-        img: "/archive/assets/luffy-01.jpg",
-        look: "/archive/assets/luffy-02.jpg",
+        img: "/archive/assets/products/luffy-01.jpg",
+        look: "/archive/assets/products/luffy-02.jpg",
         tag: "Gear 5 Drop",
       },
       {
         code: "ICHIGO-01",
         title: "Ichigo Hollow Grunge",
         status: "AVAILABLE",
-        img: "/archive/assets/ichigo-01.jpg",
-        look: "/archive/assets/ichigo-02.jpg",
+        img: "/archive/assets/products/ichigo-01.jpg",
+        look: "/archive/assets/products/ichigo-02.jpg",
         tag: "Archive Print",
       },
       {
         code: "ULQ-01",
         title: "Ulquiorra Segunda Etapa",
         status: "LIMITED",
-        img: "/archive/assets/ulquiorra-01.jpg",
-        look: "/archive/assets/ulquiorra-01.jpg",
+        img: "/archive/assets/products/ulquiorra-01.jpg",
+        look: "/archive/assets/products/ulquiorra-01.jpg",
         tag: "Night Drop",
       },
       // If you add more later, extend here
@@ -165,8 +166,20 @@ export default function ArchiveClient() {
               </div>
 
               <figure className="md-figure">
-                <img className="md-img md-imgBase" src={p.img} alt={p.title} loading="lazy" />
-                <img className="md-img md-imgLook" src={p.look} alt={`${p.title} look`} loading="lazy" />
+                <ProductImage
+                  className="md-img md-imgBase"
+                  src={p.img}
+                  alt={p.title}
+                  fill
+                  sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
+                />
+                <ProductImage
+                  className="md-img md-imgLook"
+                  src={p.look}
+                  alt={`${p.title} look`}
+                  fill
+                  sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 33vw"
+                />
                 <div className="md-glitchOverlay" aria-hidden="true" />
               </figure>
 

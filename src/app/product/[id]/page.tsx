@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { getProduct } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
 import Link from "next/link";
+import ProductImage from "@/components/ProductImage";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
@@ -34,7 +35,16 @@ export default function ProductDetailPage() {
     <div className="page">
       <div className="detail">
         <div className="detail__img">
-          <img src={product.image} alt={product.name} loading="lazy" />
+          <ProductImage
+            className="detail__media"
+            src={product.imageUrl}
+            fallbackSrc={product.imageFallbackUrl}
+            alt={product.name}
+            width={1600}
+            height={1600}
+            priority
+            sizes="(max-width: 900px) 100vw, 55vw"
+          />
         </div>
 
         <div className="detail__info">

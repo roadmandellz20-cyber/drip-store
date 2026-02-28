@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { cartTotal, decQty, incQty, readCart, removeFromCart, type CartItem } from "@/lib/cart";
+import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
   if (!el) return;
@@ -72,7 +73,15 @@ export default function CartDrawer({
           <div className="drawer__list">
             {items.map((i) => (
               <div className="cart-item" key={`${i.id}-${i.size}`}>
-                <img className="cart-item__img" src={i.product.image} alt={i.product.name} loading="lazy" />
+                <ProductImage
+                  className="cart-item__img"
+                  src={i.product.imageUrl}
+                  fallbackSrc={i.product.imageFallbackUrl}
+                  alt={i.product.name}
+                  width={78}
+                  height={78}
+                  sizes="78px"
+                />
                 <div className="cart-item__meta">
                   <div className="cart-item__sku">{i.product.sku}</div>
                   <div className="cart-item__name">{i.product.name}</div>

@@ -3,8 +3,10 @@ export type Product = {
   sku: string; // luffy-01 etc
   name: string; // display name
   price: number; // in GMD
-  image: string; // main product image
-  look: string; // hover lookbook image
+  imageUrl: string; // canonical product image URL
+  imageFallbackUrl: string; // local optimized fallback
+  lookImageUrl: string; // hover/lookbook image URL
+  lookImageFallbackUrl: string; // local optimized fallback
   limited: boolean;
   isNew: boolean;
   category: "all" | "new" | "limited";
@@ -13,14 +15,46 @@ export type Product = {
   brandLine: string;
 };
 
+const SUPABASE_PRODUCT_IMAGE_BASE = (() => {
+  const explicitBase = process.env.NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL?.trim();
+  if (explicitBase) return explicitBase.replace(/\/$/, "");
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!supabaseUrl) return "";
+
+  return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/products`;
+})();
+
+function getLocalProductImageUrl(sku: string) {
+  return `/archive/assets/products/${sku}.jpg`;
+}
+
+function getCanonicalProductImageUrl(sku: string) {
+  if (!SUPABASE_PRODUCT_IMAGE_BASE) {
+    return getLocalProductImageUrl(sku);
+  }
+
+  return `${SUPABASE_PRODUCT_IMAGE_BASE}/${sku}.jpg`;
+}
+
+function buildProductImages(sku: string) {
+  const fallbackUrl = getLocalProductImageUrl(sku);
+
+  return {
+    imageUrl: getCanonicalProductImageUrl(sku),
+    imageFallbackUrl: fallbackUrl,
+    lookImageUrl: getCanonicalProductImageUrl(sku),
+    lookImageFallbackUrl: fallbackUrl,
+  };
+}
+
 export const PRODUCTS: Product[] = [
   {
     id: "luffy-02",
     sku: "luffy-02",
     name: "Gear 5 Luffy Collage Tee (Black)",
     price: 1500,
-    image: "/archive/assets/luffy-02.jpg",
-    look: "/archive/assets/luffy-02.jpg",
+    ...buildProductImages("luffy-02"),
     limited: false,
     isNew: true,
     category: "new",
@@ -41,8 +75,7 @@ export const PRODUCTS: Product[] = [
     sku: "luffy-01",
     name: "One Piece Legacy Panel Tee (Black)",
     price: 2000,
-    image: "/archive/assets/luffy-01.jpg",
-    look: "/archive/assets/luffy-01.jpg",
+    ...buildProductImages("luffy-01"),
     limited: true,
     isNew: false,
     category: "limited",
@@ -63,8 +96,7 @@ export const PRODUCTS: Product[] = [
     sku: "ichigo-01",
     name: "Ichigo Hollow Grunge Tee (White Distressed)",
     price: 2000,
-    image: "/archive/assets/ichigo-01.jpg",
-    look: "/archive/assets/ichigo-01.jpg",
+    ...buildProductImages("ichigo-01"),
     limited: true,
     isNew: true,
     category: "limited",
@@ -85,8 +117,7 @@ export const PRODUCTS: Product[] = [
     sku: "ulquiorra-01",
     name: "Ulquiorra Segunda Etapa Tee (Black)",
     price: 2000,
-    image: "/archive/assets/ulquiorra-01.jpg",
-    look: "/archive/assets/ulquiorra-01.jpg",
+    ...buildProductImages("ulquiorra-01"),
     limited: true,
     isNew: false,
     category: "limited",
@@ -107,8 +138,7 @@ export const PRODUCTS: Product[] = [
     sku: "ichigo-02",
     name: "Tensa Zangetsu Fragment Tee (White Distressed)",
     price: 1500,
-    image: "/archive/assets/ichigo-02.jpg",
-    look: "/archive/assets/ichigo-02.jpg",
+    ...buildProductImages("ichigo-02"),
     limited: false,
     isNew: false,
     category: "all",

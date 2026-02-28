@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ProductImage from "@/components/ProductImage";
 import {
   cartTotal,
   clearCart,
@@ -189,7 +190,14 @@ export default function CheckoutPage() {
           <div className="checkout__list">
             {items.map((item) => (
               <div className="checkout__item" key={`${item.id}-${item.size}`}>
-                <img src={item.product.image} alt={item.product.name} loading="lazy" />
+                <ProductImage
+                  src={item.product.imageUrl}
+                  fallbackSrc={item.product.imageFallbackUrl}
+                  alt={item.product.name}
+                  width={100}
+                  height={100}
+                  sizes="100px"
+                />
 
                 <div className="checkout__meta">
                   <div className="checkout__sku">{item.product.sku}</div>

@@ -4,7 +4,7 @@ export type CartItem = {
   id: string;
   qty: number;
   size: "S" | "M" | "L" | "XL";
-  product: Pick<Product, "id" | "name" | "price" | "image" | "sku">;
+  product: Pick<Product, "id" | "name" | "price" | "imageUrl" | "imageFallbackUrl" | "sku">;
 };
 
 const KEY = "mugen_cart_v1";
@@ -22,7 +22,35 @@ export function readCart(): CartItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed;
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+
+        const product =
+          item.product && typeof item.product === "object"
+            ? item.product
+            : {};
+        const imageUrl =
+          typeof product.imageUrl === "string"
+            ? product.imageUrl
+            : typeof product.image === "string"
+              ? product.image
+              : "";
+        const imageFallbackUrl =
+          typeof product.imageFallbackUrl === "string"
+            ? product.imageFallbackUrl
+            : imageUrl;
+
+        return {
+          ...item,
+          product: {
+            ...product,
+            imageUrl,
+            imageFallbackUrl,
+          },
+        };
+      })
+      .filter(Boolean) as CartItem[];
   } catch {
     return [];
   }
@@ -47,7 +75,8 @@ export function addToCart(product: Product, size: CartItem["size"] = "M", qty = 
         id: product.id,
         name: product.name,
         price: product.price,
-        image: product.image,
+        imageUrl: product.imageUrl,
+        imageFallbackUrl: product.imageFallbackUrl,
         sku: product.sku,
       },
     });
