@@ -359,7 +359,10 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   }
   .hero-title,
   h1.mugen-header{
-    color:#fff !important;
+    position:relative !important;
+    z-index:3 !important;
+    isolation:isolate !important;
+    color:var(--fg) !important;
     font-size:10.2vw !important;
     width:100% !important;
     max-width:100% !important;
@@ -371,11 +374,11 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
     display:block !important;
     text-align:left !important;
     line-height:.85 !important;
-    text-shadow:2px 0 #ff0000, -2px 0 #00e5ff !important;
+    text-shadow:-2px 0 var(--red), 2px 0 cyan !important;
   }
   .hero-title span,
   h1.mugen-header span{
-    color:var(--red) !important;
+    color:inherit !important;
     display:block !important;
     white-space:nowrap !important;
   }
@@ -384,6 +387,8 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
     content:none !important;
   }
   .hero__inner{
+    position:relative !important;
+    z-index:2 !important;
     max-width:none !important;
     padding-left:0 !important;
     padding-right:0 !important;
