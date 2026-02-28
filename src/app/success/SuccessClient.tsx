@@ -26,13 +26,12 @@ function buildLuxuryMessage(params: {
   const lines = [
     "ENTER THE MUGEN.",
     "",
+    "Hey Mugen District — I just placed an order.",
+    "",
     `Order Locked: ${orderRef || "MGN-—"}`,
-    orderId ? `Order ID: ${orderId}` : "",
+    `Order ID: ${orderId || "—"}`,
     "",
-    "Your piece has entered the archive.",
-    "We’ll contact you shortly with next steps.",
-    "",
-    "— MUGEN DISTRICT",
+    "Looking forward to the next steps.",
   ].filter(Boolean);
 
   return lines.join("\n");
