@@ -12,14 +12,24 @@ type ProductImageProps = Omit<ImageProps, "src" | "quality"> & {
   fallbackSrc?: string;
 };
 
+const PLACEHOLDER_SRC =
+  "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200' viewBox='0 0 1200 1200'%3E%3Crect width='1200' height='1200' fill='%23090909'/%3E%3C/svg%3E";
+
+function toSafeSrc(value?: string) {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized || PLACEHOLDER_SRC;
+}
+
 export default function ProductImage({
   src,
   fallbackSrc,
   alt,
   ...props
 }: ProductImageProps) {
-  const preferredSrc = getPreferredProductImageSrc(src, fallbackSrc);
-  const [currentSrc, setCurrentSrc] = useState(preferredSrc);
+  const safeSrc = toSafeSrc(src);
+  const safeFallbackSrc = toSafeSrc(fallbackSrc);
+  const preferredSrc = toSafeSrc(getPreferredProductImageSrc(safeSrc, safeFallbackSrc));
+  const [currentSrc, setCurrentSrc] = useState<string>(preferredSrc);
 
   useEffect(() => {
     setCurrentSrc(preferredSrc);
@@ -36,13 +46,13 @@ export default function ProductImage({
       quality={70}
       src={currentSrc}
       onError={() => {
-        if (currentSrc !== src) {
-          setCurrentSrc(src);
+        if (currentSrc !== safeSrc) {
+          setCurrentSrc(safeSrc);
           return;
         }
 
-        if (fallbackSrc && currentSrc !== fallbackSrc) {
-          setCurrentSrc(fallbackSrc);
+        if (currentSrc !== safeFallbackSrc) {
+          setCurrentSrc(safeFallbackSrc);
         }
       }}
     />
