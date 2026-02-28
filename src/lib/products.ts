@@ -1,12 +1,12 @@
 export type Product = {
-  id: string; // stable unique id used for routing
-  sku: string; // luffy-01 etc
-  name: string; // display name
-  price: number; // in GMD
-  imageUrl: string; // canonical product image URL
-  imageFallbackUrl: string; // local optimized fallback
-  lookImageUrl: string; // hover/lookbook image URL
-  lookImageFallbackUrl: string; // local optimized fallback
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  imageUrl: string;
+  imageFallbackUrl: string;
+  lookImageUrl: string;
+  lookImageFallbackUrl: string;
   limited: boolean;
   isNew: boolean;
   category: "all" | "new" | "limited";

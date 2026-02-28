@@ -22,14 +22,12 @@ export function readCart(): CartItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
+
     return parsed
       .map((item) => {
-        if (!item || typeof item !== "object") return null;
+        const product = item?.product;
+        if (!product || typeof product !== "object") return null;
 
-        const product =
-          item.product && typeof item.product === "object"
-            ? item.product
-            : {};
         const imageUrl =
           typeof product.imageUrl === "string"
             ? product.imageUrl
@@ -41,16 +39,33 @@ export function readCart(): CartItem[] {
             ? product.imageFallbackUrl
             : imageUrl;
 
+        if (
+          typeof item.id !== "string" ||
+          typeof item.qty !== "number" ||
+          typeof item.size !== "string" ||
+          typeof product.name !== "string" ||
+          typeof product.price !== "number" ||
+          typeof product.sku !== "string" ||
+          !imageUrl
+        ) {
+          return null;
+        }
+
         return {
-          ...item,
+          id: item.id,
+          qty: item.qty,
+          size: item.size,
           product: {
-            ...product,
+            id: typeof product.id === "string" ? product.id : item.id,
+            name: product.name,
+            price: product.price,
             imageUrl,
             imageFallbackUrl,
+            sku: product.sku,
           },
-        };
+        } satisfies CartItem;
       })
-      .filter(Boolean) as CartItem[];
+      .filter((item): item is CartItem => item !== null);
   } catch {
     return [];
   }
@@ -65,8 +80,9 @@ export function writeCart(items: CartItem[]) {
 export function addToCart(product: Product, size: CartItem["size"] = "M", qty = 1) {
   const items = readCart();
   const existing = items.find((i) => i.id === product.id && i.size === size);
-  if (existing) existing.qty += qty;
-  else {
+  if (existing) {
+    existing.qty += qty;
+  } else {
     items.push({
       id: product.id,
       qty,

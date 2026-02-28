@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import type { Product } from "@/lib/products";
 import { addToCart } from "@/lib/cart";
 import { warmProductImage } from "@/lib/product-images";
+import type { Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -41,9 +41,8 @@ export default function ProductCard({
   const status = product.limited ? "LIMITED" : "AVAILABLE";
 
   const tilt = useMemo(() => {
-    // controlled chaos: deterministic tilt from id (no Math.random hydration issues)
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    const deg = ((seed % 7) - 3) * 0.6; // -1.8..+1.8
+    const deg = ((seed % 7) - 3) * 0.6;
     return deg;
   }, [product.id]);
 
