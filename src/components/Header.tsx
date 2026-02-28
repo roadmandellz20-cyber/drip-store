@@ -14,6 +14,9 @@ const LINKS: NavLink[] = [
   { href: "/store", label: "ALL PRODUCTS" },
 ];
 
+const PROMO_TEXT = "LIMITED DROP LIVE • Ships in 24–48h • No mass restocks";
+const PROMO_LOOP = `${PROMO_TEXT} • ${PROMO_TEXT} • ${PROMO_TEXT} • `;
+
 function triggerClickGlitch(el: HTMLElement | null) {
   if (!el) return;
   el.classList.remove("sv-click");
@@ -63,10 +66,15 @@ export default function Header() {
 
   return (
     <>
-      <div className="promo-bar">LIMITED DROP LIVE • Ships in 24–48h • No mass restocks</div>
+      <div className="promo-bar" aria-label={PROMO_TEXT}>
+        <div className="promo-track" aria-hidden="true">
+          <div className="promo-copy">{PROMO_LOOP}</div>
+          <div className="promo-copy">{PROMO_LOOP}</div>
+        </div>
+      </div>
 
       <header className="site-header">
-        <Link className="brand" href="/archive" onClick={(e) => triggerClickGlitch(e.currentTarget)}>
+        <Link className="brand nav-logo" href="/archive" onClick={(e) => triggerClickGlitch(e.currentTarget)}>
           <span className="brand__name">MUGEN DISTRICT</span>
           <span className="brand__jp">無限</span>
         </Link>

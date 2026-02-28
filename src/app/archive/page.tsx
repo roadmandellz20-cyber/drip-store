@@ -5,7 +5,7 @@ import { ALL_PRODUCTS } from "@/lib/products";
 export default function ArchivePage() {
   return (
     <div className="archive">
-      <section className="hero" role="banner">
+      <section className="hero hero-container" id="hero-section" role="banner">
         <div className="hero__bg" />
         <div className="hero__shade" />
         <div className="hero__torn" aria-hidden="true" />
@@ -13,7 +13,7 @@ export default function ArchivePage() {
         <div className="hero__inner">
           <div className="hero__kicker">URBAN TOKYO CHAOS</div>
 
-          <h1 className="hero__title" data-text="MUGEN DISTRICT">
+          <h1 className="hero__title hero-title mugen-header" data-text="MUGEN DISTRICT">
             MUGEN <span>DISTRICT</span>
           </h1>
 
