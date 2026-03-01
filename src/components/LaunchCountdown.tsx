@@ -49,6 +49,7 @@ export default function LaunchCountdown({
   const inlineTimeText = hasHydrated
     ? `${days}D ${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`
     : "--D --:--:--";
+  const inlineDisplayText = `DROP OPENS IN / ${inlineTimeText}`;
 
   if (variant === "inline") {
     return (
@@ -56,10 +57,7 @@ export default function LaunchCountdown({
         {isLive ? (
           <span className="launchInline__live">DROP IS LIVE</span>
         ) : (
-          <>
-            <span className="launchInline__label">DROP OPENS IN</span>
-            <span className="launchInline__time">{inlineTimeText}</span>
-          </>
+          <span className="launchInline__time">{inlineDisplayText}</span>
         )}
       </div>
     );

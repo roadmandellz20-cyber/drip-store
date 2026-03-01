@@ -21,7 +21,9 @@ export default async function LimitedPage() {
         <h1 className="page__title">LIMITED</h1>
         <p className="page__sub">Each limited piece is capped. No restocks. When it&apos;s gone, it&apos;s archived.</p>
       </div>
-      <ProductGrid products={limitedProducts} />
+      <div className="limited-grid-wrap">
+        <ProductGrid products={limitedProducts} />
+      </div>
     </div>
   );
 }
