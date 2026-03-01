@@ -21,7 +21,7 @@ export default async function NewPage() {
         <h1 className="page__title">NEW</h1>
         <p className="page__sub">Fresh prints. Same chaos.</p>
       </div>
-      <ProductGrid products={newProducts} />
+      <ProductGrid products={newProducts} priorityCount={0} />
     </div>
   );
 }

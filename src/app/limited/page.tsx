@@ -22,7 +22,7 @@ export default async function LimitedPage() {
         <p className="page__sub">Each limited piece is capped. No restocks. When it&apos;s gone, it&apos;s archived.</p>
       </div>
       <div className="limited-grid-wrap">
-        <ProductGrid products={limitedProducts} />
+        <ProductGrid products={limitedProducts} priorityCount={0} />
       </div>
     </div>
   );

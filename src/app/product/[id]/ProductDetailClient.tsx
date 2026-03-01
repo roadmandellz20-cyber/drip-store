@@ -10,7 +10,7 @@ import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
 import { trackEvent } from "@/lib/analytics";
 import { addToCart } from "@/lib/cart";
-import { getProductUiState, LIMITED_STOCK_QTY, type Product } from "@/lib/products";
+import { getProductUiState, type Product } from "@/lib/products";
 
 export default function ProductDetailClient({
   initialProduct,
@@ -26,8 +26,6 @@ export default function ProductDetailClient({
   const product = liveProduct || initialProduct;
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
-  const lockedQty =
-    typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : LIMITED_STOCK_QTY;
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
 
@@ -79,7 +77,7 @@ export default function ProductDetailClient({
                 <span className="chip chip--limited">LIMITED ARCHIVE</span>
                 <span>{scarcityText}</span>
               </div>
-              {!launchLive ? <div className="detail__stockNote">{lockedQty} made. Opens April 1.</div> : null}
+              {!launchLive ? <div className="detail__stockNote">Opens April 1 (00:00)</div> : null}
               <div className="detail__stockSubline">Archive run. No restocks.</div>
             </div>
           ) : null}

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
@@ -10,6 +9,31 @@ const waitlistIpLog = new Map<string, number>();
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const message = "message" in error ? asString(error.message) : "";
+    const details = "details" in error ? asString(error.details) : "";
+    const hint = "hint" in error ? asString(error.hint) : "";
+
+    return message || details || hint || "Waitlist signup failed.";
+  }
+
+  return "Waitlist signup failed.";
+}
+
+async function loadSupabaseAdmin() {
+  try {
+    const mod = await import("@/lib/supabase-admin");
+    return mod.supabaseAdmin;
+  } catch (error) {
+    throw new Error(getErrorMessage(error));
+  }
 }
 
 function getClientIp(request: Request) {
@@ -66,6 +90,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const supabaseAdmin = await loadSupabaseAdmin();
+
     const { error } = await supabaseAdmin.from("waitlist").insert({
       contact,
       source,
@@ -78,7 +104,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Waitlist signup failed.";
+    const message = getErrorMessage(error);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

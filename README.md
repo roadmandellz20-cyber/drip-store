@@ -77,3 +77,10 @@ Run SQL files in `supabase/migrations/` in order, then run `migrate_orders.sql` 
 - `20260226_manual_orders.sql`
 - `20260226_critical_alignment_and_seed.sql`
 - `20260226_master_schema_alignment.sql`
+- `20260301_waitlist.sql`
+- `20260301_waitlist_public_insert_policy.sql`
+
+Manual SQL Editor scripts:
+
+- `migrate_orders.sql`
+- `migrate_waitlist.sql`

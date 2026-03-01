@@ -1,7 +1,6 @@
 import "server-only";
 
 import { ALL_PRODUCTS, mergeProductInventory, type ProductInventorySnapshot } from "@/lib/products";
-import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -51,32 +50,50 @@ function normalizeInventoryRow(row: Record<string, unknown>): ProductInventorySn
   return snapshot;
 }
 
+async function loadSupabaseAdmin() {
+  try {
+    const mod = await import("@/lib/supabase-admin");
+    return mod.supabaseAdmin;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchProductInventorySnapshots(slugs?: string[]) {
   const normalizedSlugs = Array.from(
     new Set((slugs || []).map((slug) => slug.trim().toLowerCase()).filter(Boolean))
   );
 
-  let primaryQuery = supabaseAdmin
-    .from("products")
-    .select("id,slug,sku,status,is_limited,stock_qty,sold_qty");
-
-  if (normalizedSlugs.length > 0) {
-    primaryQuery = primaryQuery.in("slug", normalizedSlugs);
+  const supabaseAdmin = await loadSupabaseAdmin();
+  if (!supabaseAdmin) {
+    return [];
   }
 
-  const primary = await primaryQuery;
+  try {
+    let primaryQuery = supabaseAdmin
+      .from("products")
+      .select("id,slug,sku,status,is_limited,stock_qty,sold_qty");
 
-  const rows = primary.error
-    ? (
-        await (normalizedSlugs.length > 0
-          ? supabaseAdmin.from("products").select("*").in("slug", normalizedSlugs)
-          : supabaseAdmin.from("products").select("*"))
-      ).data || []
-    : primary.data || [];
+    if (normalizedSlugs.length > 0) {
+      primaryQuery = primaryQuery.in("slug", normalizedSlugs);
+    }
 
-  return (rows as Record<string, unknown>[])
-    .map((row) => normalizeInventoryRow(row))
-    .filter((row): row is ProductInventorySnapshot => row !== null);
+    const primary = await primaryQuery;
+
+    const rows = primary.error
+      ? (
+          await (normalizedSlugs.length > 0
+            ? supabaseAdmin.from("products").select("*").in("slug", normalizedSlugs)
+            : supabaseAdmin.from("products").select("*"))
+        ).data || []
+      : primary.data || [];
+
+    return (rows as Record<string, unknown>[])
+      .map((row) => normalizeInventoryRow(row))
+      .filter((row): row is ProductInventorySnapshot => row !== null);
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchProductsWithInventory(slugs?: string[]) {

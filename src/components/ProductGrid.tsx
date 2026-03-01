@@ -7,7 +7,7 @@ import ProductCard from "./ProductCard";
 
 export default function ProductGrid({
   products,
-  priorityCount = 2,
+  priorityCount = 0,
 }: {
   products: Product[];
   priorityCount?: number;

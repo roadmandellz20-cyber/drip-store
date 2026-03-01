@@ -88,9 +88,21 @@ function resolveLimitedFlag(
   product: Product,
   snapshot?: ProductInventorySnapshot | Product | null
 ) {
+  const baseLimited =
+    typeof product.isLimited === "boolean" ? product.isLimited : Boolean(product.limited);
+
+  if (baseLimited) return true;
   if (typeof snapshot?.isLimited === "boolean") return snapshot.isLimited;
-  if (typeof product.isLimited === "boolean") return product.isLimited;
-  return Boolean(product.limited);
+  return baseLimited;
+}
+
+function getLimitedStockTotal(
+  product: Pick<Product, "isLimited" | "stockQty">
+) {
+  if (!product.isLimited) return null;
+  return typeof product.stockQty === "number" && product.stockQty > 0
+    ? product.stockQty
+    : LIMITED_STOCK_QTY;
 }
 
 export function applyProductInventory(
@@ -151,9 +163,7 @@ export function getProductStockText(
   if (!product.isLimited) return "";
 
   const availableQty = product.availableQty ?? product.available;
-  const fallbackTotal =
-    (typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : null) ??
-    LIMITED_STOCK_QTY;
+  const fallbackTotal = getLimitedStockTotal(product) ?? LIMITED_STOCK_QTY;
 
   if (!launchLive) {
     return `LIMITED STOCK — ${fallbackTotal} TOTAL`;
@@ -173,7 +183,10 @@ export function getProductUiState(
   launchLive = true
 ) {
   const soldOutUi = launchLive && product.soldOut;
-  const scarcityText = getProductStockText(product, launchLive);
+  const scarcityText =
+    !launchLive && product.isLimited
+      ? `LIMITED STOCK — ${(getLimitedStockTotal(product) ?? LIMITED_STOCK_QTY).toString()} TOTAL`
+      : getProductStockText(product, true);
 
   return { soldOutUi, scarcityText };
 }
