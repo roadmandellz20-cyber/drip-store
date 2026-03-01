@@ -166,8 +166,45 @@ export function getProductStockText(
   return `Only ${availableQty} left`;
 }
 
+export function getProductUiState(
+  product: Pick<Product, "isLimited" | "soldOut" | "available" | "stockQty"> & {
+    availableQty?: number | null;
+  },
+  launchLive = true
+) {
+  const soldOutUi = launchLive && product.soldOut;
+  const scarcityText = getProductStockText(product, launchLive);
+
+  return { soldOutUi, scarcityText };
+}
+
 export function isProductSoldOut(product: Pick<Product, "isLimited" | "soldOut">) {
   return product.isLimited && product.soldOut;
+}
+
+function hashString(value: string) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
+}
+
+function sortProductsBySeed(products: Product[], seedKey: string) {
+  const seed = hashString(seedKey);
+
+  return [...products].sort((left, right) => {
+    const leftScore = (hashString(`${left.id}:${left.sku}`) ^ seed) >>> 0;
+    const rightScore = (hashString(`${right.id}:${right.sku}`) ^ seed) >>> 0;
+
+    if (leftScore !== rightScore) {
+      return leftScore - rightScore;
+    }
+
+    return left.name.localeCompare(right.name);
+  });
 }
 
 const BASE_PRODUCTS: Product[] = [
@@ -289,3 +326,22 @@ export const getProductBySku = (sku: string) => {
 };
 export const NEW_PRODUCTS = ALL_PRODUCTS.filter((product) => product.isNew);
 export const LIMITED_PRODUCTS = ALL_PRODUCTS.filter((product) => product.isLimited);
+
+export function getRelatedProducts(
+  currentProduct: Pick<Product, "id" | "category" | "isLimited">,
+  count = 3
+) {
+  const candidates = ALL_PRODUCTS.filter((product) => product.id !== currentProduct.id);
+  const preferred = candidates.filter(
+    (product) => product.category === currentProduct.category || (currentProduct.isLimited && product.isLimited)
+  );
+  const preferredIds = new Set(preferred.map((product) => product.id));
+  const fallback = candidates.filter((product) => !preferredIds.has(product.id));
+
+  return [
+    ...sortProductsBySeed(preferred, currentProduct.id),
+    ...sortProductsBySeed(fallback, `${currentProduct.id}:fallback`),
+  ]
+    .slice(0, count)
+    .map((product) => applyProductInventory(product));
+}

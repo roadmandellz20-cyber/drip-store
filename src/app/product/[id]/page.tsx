@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ProductDetailClient from "./ProductDetailClient";
-import { getProduct } from "@/lib/products";
+import { getProduct, getRelatedProducts } from "@/lib/products";
 import { fetchProductsWithInventory } from "@/lib/products-server";
 import { absoluteUrl, extractSummary } from "@/lib/site";
 
@@ -66,6 +66,7 @@ export default async function ProductDetailPage({
   const [liveProduct] = await fetchProductsWithInventory([productId]);
   const fallbackProduct = getProduct(productId);
   const product = liveProduct || fallbackProduct;
+  const relatedProducts = product ? getRelatedProducts(product, 3) : [];
 
   if (!product) {
     return (
@@ -81,5 +82,5 @@ export default async function ProductDetailPage({
     );
   }
 
-  return <ProductDetailClient initialProduct={product} />;
+  return <ProductDetailClient initialProduct={product} relatedProducts={relatedProducts} />;
 }

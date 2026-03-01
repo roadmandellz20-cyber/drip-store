@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
 import { warmProductImage } from "@/lib/product-images";
-import { getProductStockText, LIMITED_STOCK_QTY, type Product } from "@/lib/products";
+import { getProductUiState, LIMITED_STOCK_QTY, type Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -35,11 +35,11 @@ export default function ProductCard({
 }) {
   const router = useRouter();
   const [hover, setHover] = useState(false);
+  const [leadLoaded, setLeadLoaded] = useState(false);
   const cardRef = useRef<HTMLElement | null>(null);
   const warmedRef = useRef(false);
 
-  const soldOutUi = launchLive && product.soldOut;
-  const stockText = getProductStockText(product, launchLive);
+  const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
   const lockedQty =
     typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : LIMITED_STOCK_QTY;
@@ -91,7 +91,7 @@ export default function ProductCard({
         </div>
 
         <Link
-          className={`p-card__imgWrap ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
+          className={`p-card__imgWrap ${leadLoaded ? "p-card__imgWrap--loaded" : ""} ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
           href={`/product/${product.id}`}
           aria-label={product.name}
           onTouchStart={warmDetailAssets}
@@ -105,7 +105,9 @@ export default function ProductCard({
             variant="grid"
             fill
             priority={priority}
+            loading={priority ? undefined : "lazy"}
             sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
+            onLoadStateChange={setLeadLoaded}
           />
           <ProductImage
             className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
@@ -114,6 +116,7 @@ export default function ProductCard({
             alt={`${product.name} lookbook`}
             variant="grid"
             fill
+            loading="lazy"
             sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
           />
 
@@ -128,14 +131,14 @@ export default function ProductCard({
               {launchLive ? (
                 <>
                   <div className="p-card__scarcityLabel">LIMITED STOCK</div>
-                  {stockText ? (
+                  {scarcityText ? (
                     <div className={`p-card__stock ${soldOutUi ? "p-card__stock--soldout" : ""}`}>
-                      {stockText}
+                      {scarcityText}
                     </div>
                   ) : null}
                 </>
               ) : (
-                <div className="p-card__stock">{stockText}</div>
+                <div className="p-card__stock">{scarcityText}</div>
               )}
             </div>
           ) : null}

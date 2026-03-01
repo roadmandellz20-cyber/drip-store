@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type ImageProps } from "next/image";
-import { useEffect, useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import {
   getProductDisplaySrc,
   getProductImageBlurDataUrl,
@@ -12,6 +12,7 @@ type ProductImageProps = Omit<ImageProps, "src" | "quality"> & {
   src: string;
   fallbackSrc?: string;
   variant?: "grid" | "detail" | "thumb";
+  onLoadStateChange?: (loaded: boolean) => void;
 };
 
 const PLACEHOLDER_SRC =
@@ -27,6 +28,12 @@ export default function ProductImage({
   fallbackSrc,
   alt,
   variant = "grid",
+  className,
+  loading,
+  onError,
+  onLoad,
+  onLoadStateChange,
+  priority,
   ...props
 }: ProductImageProps) {
   const safeSrc = toSafeSrc(src);
@@ -34,13 +41,74 @@ export default function ProductImage({
   const preferredSrc = toSafeSrc(
     getProductDisplaySrc(toSafeSrc(getPreferredProductImageSrc(safeSrc, safeFallbackSrc)), variant)
   );
+  return (
+    <ResolvedProductImage
+      key={`${preferredSrc}:${variant}`}
+      {...props}
+      alt={alt}
+      className={className}
+      fallbackSrc={safeFallbackSrc}
+      loading={loading}
+      onError={onError}
+      onLoad={onLoad}
+      onLoadStateChange={onLoadStateChange}
+      preferredSrc={preferredSrc}
+      priority={priority}
+      safeSrc={safeSrc}
+      variant={variant}
+    />
+  );
+}
+
+function ResolvedProductImage({
+  alt,
+  className,
+  fallbackSrc,
+  loading,
+  onError,
+  onLoad,
+  onLoadStateChange,
+  preferredSrc,
+  priority,
+  safeSrc,
+  variant,
+  ...props
+}: Omit<ProductImageProps, "src" | "fallbackSrc"> & {
+  fallbackSrc: string;
+  preferredSrc: string;
+  safeSrc: string;
+}) {
   const [currentSrc, setCurrentSrc] = useState<string>(preferredSrc);
-
-  useEffect(() => {
-    setCurrentSrc(preferredSrc);
-  }, [preferredSrc]);
-
+  const [isLoaded, setIsLoaded] = useState(false);
   const blurDataURL = getProductImageBlurDataUrl();
+  const imageClassName = [className, isLoaded ? "is-loaded" : "is-loading"].filter(Boolean).join(" ");
+
+  const markLoaded = (event: SyntheticEvent<HTMLImageElement>) => {
+    if (!isLoaded) {
+      setIsLoaded(true);
+      onLoadStateChange?.(true);
+    }
+
+    onLoad?.(event);
+  };
+
+  const handleError = (event: SyntheticEvent<HTMLImageElement>) => {
+    if (currentSrc !== safeSrc) {
+      setIsLoaded(false);
+      onLoadStateChange?.(false);
+      setCurrentSrc(safeSrc);
+      onError?.(event);
+      return;
+    }
+
+    if (currentSrc !== fallbackSrc) {
+      setIsLoaded(false);
+      onLoadStateChange?.(false);
+      setCurrentSrc(fallbackSrc);
+    }
+
+    onError?.(event);
+  };
 
   return (
     <Image
@@ -48,18 +116,13 @@ export default function ProductImage({
       alt={alt}
       placeholder="blur"
       blurDataURL={blurDataURL}
+      className={imageClassName}
+      loading={priority ? undefined : loading ?? "lazy"}
+      priority={priority}
       quality={variant === "detail" ? 82 : variant === "thumb" ? 58 : 72}
       src={currentSrc}
-      onError={() => {
-        if (currentSrc !== safeSrc) {
-          setCurrentSrc(safeSrc);
-          return;
-        }
-
-        if (currentSrc !== safeFallbackSrc) {
-          setCurrentSrc(safeFallbackSrc);
-        }
-      }}
+      onError={handleError}
+      onLoad={markLoaded}
     />
   );
 }

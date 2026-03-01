@@ -2,26 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import ProductGrid from "@/components/ProductGrid";
 import ProductImage from "@/components/ProductImage";
 import LaunchCountdown from "@/components/LaunchCountdown";
+import WaitlistModal from "@/components/WaitlistModal";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
 import { trackEvent } from "@/lib/analytics";
 import { addToCart } from "@/lib/cart";
-import { getProductStockText, type Product } from "@/lib/products";
+import { getProductUiState, LIMITED_STOCK_QTY, type Product } from "@/lib/products";
 
 export default function ProductDetailClient({
   initialProduct,
+  relatedProducts,
 }: {
   initialProduct: Product;
+  relatedProducts: Product[];
 }) {
   const [size, setSize] = useState<"S" | "M" | "L" | "XL">("M");
-  const live = useLaunchLive();
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const launchLive = useLaunchLive();
   const [liveProduct] = useLiveProducts([initialProduct]);
   const product = liveProduct || initialProduct;
-  const soldOutUi = live && product.soldOut;
-  const addDisabled = !live || soldOutUi;
-  const stockText = getProductStockText(product, live);
+  const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
+  const addDisabled = !launchLive || soldOutUi;
+  const lockedQty =
+    typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : LIMITED_STOCK_QTY;
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
 
@@ -36,7 +42,7 @@ export default function ProductDetailClient({
   }, [product.id, product.isLimited, product.name, product.price, product.sku]);
 
   const onAdd = () => {
-    if (!live || soldOutUi) return;
+    if (!launchLive || soldOutUi) return;
 
     const result = addToCart(product, size, 1);
     if (result.status === "added") {
@@ -68,9 +74,13 @@ export default function ProductDetailClient({
 
           <div className="detail__price">GMD {product.price.toLocaleString()}</div>
           {product.isLimited ? (
-            <div className={`detail__stock ${soldOutUi ? "detail__stock--soldout" : ""}`}>
-              <span className="chip chip--limited">LIMITED ARCHIVE</span>
-              <span>{stockText}</span>
+            <div className="detail__stockWrap">
+              <div className={`detail__stock ${soldOutUi ? "detail__stock--soldout" : ""}`}>
+                <span className="chip chip--limited">LIMITED ARCHIVE</span>
+                <span>{scarcityText}</span>
+              </div>
+              {!launchLive ? <div className="detail__stockNote">{lockedQty} made. Opens April 1.</div> : null}
+              <div className="detail__stockSubline">Archive run. No restocks.</div>
             </div>
           ) : null}
 
@@ -97,30 +107,42 @@ export default function ProductDetailClient({
           </div>
 
           <div className="detail__actions">
-            {!live ? <LaunchCountdown variant="inline" /> : null}
+            {!launchLive ? <LaunchCountdown variant="inline" /> : null}
 
             <button className="btn btn--primary" onClick={onAdd} disabled={addDisabled} type="button">
-              {soldOutUi ? "SOLD OUT" : live ? "ADD TO CART" : "LOCKED — Opens April 1"}
+              {soldOutUi ? "SOLD OUT" : launchLive ? "ADD TO CART" : "LOCKED — Opens April 1"}
             </button>
-            {live && !soldOutUi ? (
+            {!launchLive ? (
+              <button className="btn btn--ghost" type="button" onClick={() => setWaitlistOpen(true)}>
+                GET DROP ALERT
+              </button>
+            ) : !soldOutUi ? (
               <Link className="btn btn--ghost" href="/checkout">
                 GO TO CHECKOUT →
               </Link>
             ) : (
               <button className="btn btn--ghost" type="button" disabled>
-                {soldOutUi ? "SOLD OUT" : "LOCKED — Opens April 1"}
+                SOLD OUT
               </button>
             )}
           </div>
 
           <div className="detail__trust">
             <div className="detail__trustCard">
-              <div className="detail__label">Size Guide</div>
-              <p>S / M / L / XL. Relaxed street fit with room in the shoulders. Take your normal size.</p>
+              <div className="detail__label">DROP RULES</div>
+              <ul className="detail__trustList">
+                <li>No mass restocks</li>
+                <li>Ships 24–48h after drop (Gambia)</li>
+                <li>Limited windows</li>
+              </ul>
             </div>
             <div className="detail__trustCard">
-              <div className="detail__label">Shipping</div>
-              <p>{live ? "Ships in 24-48h locally once your order clears." : "Drop unlocks April 1. Shipping starts after launch."}</p>
+              <div className="detail__label">SIZE / FIT</div>
+              <p>Relaxed streetwear fit. Size up for oversized.</p>
+            </div>
+            <div className="detail__trustCard">
+              <div className="detail__label">CARE</div>
+              <p>Cold wash. Hang dry.</p>
             </div>
           </div>
 
@@ -134,6 +156,20 @@ export default function ProductDetailClient({
           </div>
         </div>
       </div>
+
+      {relatedProducts.length ? (
+        <section className="detail__related">
+          <div className="detail__label">You may also like</div>
+          <ProductGrid products={relatedProducts} priorityCount={0} />
+        </section>
+      ) : null}
+
+      <WaitlistModal
+        open={waitlistOpen && !launchLive}
+        onClose={() => setWaitlistOpen(false)}
+        source="product"
+        productSku={product.sku}
+      />
     </div>
   );
 }
