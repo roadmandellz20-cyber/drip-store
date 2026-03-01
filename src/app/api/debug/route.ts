@@ -6,6 +6,7 @@ export const runtime = "nodejs"; // keep it simple
 
 export async function GET() {
   const { url, key } = getSupabaseServerConfig();
+  const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
   // Don’t leak secrets
   const anonPreview = key ? `${key.slice(0, 6)}...${key.slice(-6)}` : "";
@@ -35,6 +36,7 @@ export async function GET() {
     urlHost: safeHost(url),
     url,
     anonPreview,
+    hasServiceRole: !!serviceRole,
     count: data?.length ?? 0,
     first: data?.map((p) => ({ slug: p.slug, hasCategory: !!p.category_id })) ?? [],
     error: error ?? null,

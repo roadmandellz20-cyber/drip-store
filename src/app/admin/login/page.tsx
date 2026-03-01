@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ error?: string; redirect?: string }> | { error?: string; redirect?: string };
+  searchParams?: Promise<{ error?: string; redirect?: string }>;
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const redirectPath = isSafeAdminRedirect(resolvedSearchParams.redirect)

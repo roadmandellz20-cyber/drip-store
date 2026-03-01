@@ -20,7 +20,7 @@ function redirectToOrders(request: NextRequest, state: string) {
 
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 

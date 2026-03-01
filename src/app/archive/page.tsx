@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import ArchiveFeedTicker from "@/components/ArchiveFeedTicker";
+import LegalLinks from "@/components/LegalLinks";
 import LaunchCountdown from "@/components/LaunchCountdown";
 import NewsletterSignup from "@/components/NewsletterSignup";
 import SocialLinks from "@/components/SocialLinks";
@@ -90,8 +91,12 @@ export default async function ArchivePage() {
           <div className="footer__card">
             <div className="footer__title">MANIFESTO</div>
             <p>{"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}</p>
-            <SocialLinks variant="footer" className="mt-4" />
-            <div className="footer__small">DISCARDED TOKYO NEWSPAPER • ISSUE 001</div>
+            <div className="footer__metaRow">
+              <div className="footer__socialCol">
+                <SocialLinks variant="footer" className="mt-4" />
+                <div className="footer__small">DISCARDED TOKYO NEWSPAPER • ISSUE 001</div>
+              </div>
+            </div>
           </div>
 
           <div className="footer__card">
@@ -100,6 +105,9 @@ export default async function ArchivePage() {
               <Link href="/store">All Products</Link>
               <Link href="/new">New</Link>
               <Link href="/limited">Limited</Link>
+            </div>
+            <div className="footer__legalGroup">
+              <LegalLinks className="footer__legal" itemClassName="footer__legalLink" />
             </div>
           </div>
 

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const resolvedParams = await params;
   const product = getProduct(resolvedParams.id);
@@ -59,7 +59,7 @@ export async function generateMetadata({
 export default async function ProductDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
   const productId = resolvedParams.id;

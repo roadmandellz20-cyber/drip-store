@@ -11,6 +11,12 @@ function getDebugSender() {
   return VERIFIED_FROM;
 }
 
+function asBooleanFlag(value: unknown) {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
 function parseResendResponseBody(raw: string) {
   try {
     return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
@@ -89,6 +95,7 @@ async function sendDebugEmail(toOverride: string) {
         resend_api_key: true,
         resend_from_email: !!asString(process.env.RESEND_FROM_EMAIL),
         admin_order_email: !!adminEmail,
+        resend_domain_verified: asBooleanFlag(process.env.RESEND_DOMAIN_VERIFIED),
       },
     },
     { status: response.ok ? 200 : 500 }

@@ -77,6 +77,21 @@ function asBooleanFlag(value: unknown) {
   return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
 }
 
+function buildLaunchEnvPresence() {
+  return {
+    next_public_supabase_url: Boolean(asString(process.env.NEXT_PUBLIC_SUPABASE_URL)),
+    next_public_supabase_anon_key: Boolean(asString(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)),
+    supabase_url: Boolean(asString(process.env.SUPABASE_URL)),
+    supabase_anon_key: Boolean(asString(process.env.SUPABASE_ANON_KEY)),
+    supabase_service_role_key: Boolean(asString(process.env.SUPABASE_SERVICE_ROLE_KEY)),
+    resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
+    resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
+    admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
+    inventory_tracking_enabled: Boolean(asString(process.env.INVENTORY_TRACKING_ENABLED)),
+    resend_domain_verified: Boolean(asString(process.env.RESEND_DOMAIN_VERIFIED)),
+  };
+}
+
 function normalizePriceCents(row: Record<string, unknown>) {
   const cents = asNumber(row.price_cents);
   if (Number.isFinite(cents)) return Math.round(cents);
@@ -354,19 +369,14 @@ async function sendOrderEmails(params: {
 
 export async function POST(request: Request) {
   try {
+    console.log("[orders/create] env_presence", buildLaunchEnvPresence());
+
     if (!isLaunchLive()) {
       return NextResponse.json(
         { error: "LOCKED — Opens April 1" },
         { status: 403 }
       );
     }
-
-    console.log("[orders/create] env_presence", {
-      has_resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
-      has_resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
-      has_admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
-      has_resend_domain_verified: Boolean(asString(process.env.RESEND_DOMAIN_VERIFIED)),
-    });
 
     const body = (await request.json()) as {
       shipping?: IncomingShipping;

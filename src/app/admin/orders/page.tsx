@@ -46,7 +46,7 @@ function getStateMessage(state?: string) {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ state?: string }> | { state?: string };
+  searchParams?: Promise<{ state?: string }>;
 }) {
   const sessionCookie = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
   const resolvedSearchParams = searchParams ? await searchParams : {};

@@ -9,7 +9,7 @@ type SuccessSearchParams = {
 };
 
 type SuccessPageProps = {
-  searchParams?: Promise<SuccessSearchParams> | SuccessSearchParams;
+  searchParams?: Promise<SuccessSearchParams>;
 };
 
 function pickParam(value: string | string[] | undefined) {
