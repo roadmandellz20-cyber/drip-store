@@ -80,9 +80,6 @@ export default function ProductCard({
     >
       <div className="p-card__frame">
         <div className="p-card__status">
-          <div className="p-card__statusGroup">
-            {product.isLimited ? <span className="chip chip--limited">LIMITED ARCHIVE</span> : null}
-          </div>
           <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
         </div>
 
@@ -124,9 +121,12 @@ export default function ProductCard({
           <h3 className="p-card__title">{product.name.toUpperCase()}</h3>
           {product.isLimited ? (
             <div className={`p-card__scarcity ${soldOutUi ? "p-card__scarcity--soldout" : ""}`}>
+              <div className="p-card__scarcityHead">
+                <span className="chip chip--limited">LIMITED ARCHIVE</span>
+                {launchLive ? <div className="p-card__scarcityLabel">LIMITED STOCK</div> : null}
+              </div>
               {launchLive ? (
                 <>
-                  <div className="p-card__scarcityLabel">LIMITED STOCK</div>
                   {scarcityText ? (
                     <div className={`p-card__stock ${soldOutUi ? "p-card__stock--soldout" : ""}`}>
                       {scarcityText}

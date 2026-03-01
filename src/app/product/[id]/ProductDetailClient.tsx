@@ -107,31 +107,33 @@ export default function ProductDetailClient({
           <div className="detail__actions">
             {!launchLive ? <LaunchCountdown variant="inline" /> : null}
 
-            {!launchLive ? (
-              <>
-                <button className="btn btn--primary" onClick={onAdd} disabled type="button">
-                  LOCKED — Opens April 1
-                </button>
-                <button className="btn btn--ghost" type="button" onClick={() => setWaitlistOpen(true)}>
-                  GET DROP ALERT
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="btn btn--primary" onClick={onAdd} disabled={addDisabled} type="button">
-                  {soldOutUi ? "SOLD OUT" : "ADD TO CART"}
-                </button>
-                {!soldOutUi ? (
-                  <Link className="btn btn--ghost" href="/checkout">
-                    GO TO CHECKOUT →
-                  </Link>
-                ) : (
-                  <button className="btn btn--ghost" type="button" disabled>
-                    SOLD OUT
+            <div className="detail__buttonRow">
+              {!launchLive ? (
+                <>
+                  <button className="btn btn--primary" onClick={onAdd} disabled type="button">
+                    LOCKED — Opens April 1
                   </button>
-                )}
-              </>
-            )}
+                  <button className="btn btn--ghost" type="button" onClick={() => setWaitlistOpen(true)}>
+                    GET DROP ALERT
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn--primary" onClick={onAdd} disabled={addDisabled} type="button">
+                    {soldOutUi ? "SOLD OUT" : "ADD TO CART"}
+                  </button>
+                  {!soldOutUi ? (
+                    <Link className="btn btn--ghost" href="/checkout">
+                      GO TO CHECKOUT →
+                    </Link>
+                  ) : (
+                    <button className="btn btn--ghost" type="button" disabled>
+                      SOLD OUT
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="detail__trust">
