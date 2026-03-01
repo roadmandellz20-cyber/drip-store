@@ -156,9 +156,7 @@ export function getProductStockText(
     LIMITED_STOCK_QTY;
 
   if (!launchLive) {
-    const totalQty =
-      typeof availableQty === "number" && availableQty > 0 ? availableQty : fallbackTotal;
-    return `LIMITED STOCK — ${totalQty} TOTAL`;
+    return `LIMITED STOCK — ${fallbackTotal} TOTAL`;
   }
 
   if (product.soldOut) return "SOLD OUT";

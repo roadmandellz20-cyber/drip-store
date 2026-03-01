@@ -12,7 +12,7 @@ export default function ProductGrid({ products }: { products: Product[] }) {
   return (
     <section className="grid">
       {liveProducts.map((p, index) => (
-        <ProductCard key={p.id} product={p} priority={index < 4} launchLive={launchLive} />
+        <ProductCard key={p.id} product={p} priority={index < 2} launchLive={launchLive} />
       ))}
     </section>
   );

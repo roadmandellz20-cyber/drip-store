@@ -1,7 +1,15 @@
+import type { Metadata } from "next";
 import ProductGrid from "@/components/ProductGrid";
 import { fetchProductsWithInventory } from "@/lib/products-server";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "New",
+  description: "Fresh prints. Same chaos. Browse the latest Mugen District drops.",
+  alternates: {
+    canonical: "/new",
+  },
+};
 
 export default async function NewPage() {
   const products = await fetchProductsWithInventory();

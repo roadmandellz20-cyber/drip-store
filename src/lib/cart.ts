@@ -1,4 +1,5 @@
 import type { Product } from "./products";
+import { trackEvent } from "./analytics";
 import { getProduct, isProductSoldOut, LIMITED_STOCK_QTY } from "./products";
 
 export type CartItem = {
@@ -225,6 +226,14 @@ export function addToCart(
   }
 
   writeCart(items);
+  trackEvent("add_to_cart", {
+    id: product.id,
+    sku: product.sku,
+    size,
+    qty: incomingQty,
+    limited: product.isLimited,
+    price: product.price,
+  });
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent("mugen:cart:add", {

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useLaunchLive } from "@/hooks/useLaunchLive";
 import CartDrawer from "./CartDrawer";
 import { readCart } from "@/lib/cart";
+import { getPromoTickerText } from "@/lib/launch-copy";
 
 type NavLink = { href: string; label: string };
 
@@ -14,9 +16,6 @@ const LINKS: NavLink[] = [
   { href: "/about", label: "ABOUT" },
   { href: "/store", label: "ALL PRODUCTS" },
 ];
-
-const PROMO_TEXT = "LIMITED DROP LIVE • Ships in 24–48h • No mass restocks";
-const PROMO_LOOP = `${PROMO_TEXT} • ${PROMO_TEXT} • ${PROMO_TEXT} • `;
 
 function triggerClickGlitch(el: HTMLElement | null) {
   if (!el) return;
@@ -36,10 +35,13 @@ function triggerCartAddGlitch(el: HTMLElement | null) {
 
 export default function Header() {
   const pathname = usePathname();
+  const launchLive = useLaunchLive();
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [count, setCount] = useState(0);
   const cartBtnRef = useRef<HTMLButtonElement | null>(null);
+  const promoText = useMemo(() => getPromoTickerText(launchLive), [launchLive]);
+  const promoLoop = useMemo(() => `${promoText} • ${promoText} • ${promoText} • `, [promoText]);
 
   useEffect(() => {
     const sync = () => setCount(readCart().reduce((sum, item) => sum + item.qty, 0));
@@ -67,10 +69,10 @@ export default function Header() {
 
   return (
     <>
-      <div className="promo-bar" aria-label={PROMO_TEXT}>
+      <div className="promo-bar" aria-label={promoText}>
         <div className="promo-track" aria-hidden="true">
-          <div className="promo-copy">{PROMO_LOOP}</div>
-          <div className="promo-copy">{PROMO_LOOP}</div>
+          <div className="promo-copy">{promoLoop}</div>
+          <div className="promo-copy">{promoLoop}</div>
         </div>
       </div>
 

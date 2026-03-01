@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductImage from "@/components/ProductImage";
+import { trackEvent } from "@/lib/analytics";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import {
   getCartInventoryState,
@@ -69,6 +70,7 @@ export default function CheckoutPage() {
   const [shipping, setShipping] = useState<ShippingForm>(INITIAL_SHIPPING);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const beganCheckoutRef = useRef(false);
   const live = useLaunchLive();
   const cartProducts = useMemo(
     () =>
@@ -102,6 +104,18 @@ export default function CheckoutPage() {
   const displayItems = useMemo(() => syncCartProducts(liveProducts, items).items, [items, liveProducts]);
   const total = useMemo(() => cartTotal(displayItems), [displayItems]);
   const inventoryState = useMemo(() => getCartInventoryState(displayItems), [displayItems]);
+
+  useEffect(() => {
+    if (displayItems.length === 0) return;
+    if (beganCheckoutRef.current) return;
+
+    beganCheckoutRef.current = true;
+    trackEvent("begin_checkout", {
+      items: displayItems.length,
+      total,
+      limitedItems: displayItems.filter((item) => item.product.isLimited).length,
+    });
+  }, [displayItems, total]);
 
   async function onPlaceOrder() {
     if (submitting) return;
@@ -188,6 +202,12 @@ export default function CheckoutPage() {
       }
 
       succeeded = true;
+      trackEvent("order_submitted", {
+        orderId,
+        orderRef,
+        total,
+        items: displayItems.length,
+      });
       writeOrderSuccessSummary(
         createOrderSuccessSummary({
           orderId,
@@ -235,6 +255,7 @@ export default function CheckoutPage() {
                     src={item.product.imageUrl}
                     fallbackSrc={item.product.imageFallbackUrl}
                     alt={item.product.name}
+                    variant="thumb"
                     width={100}
                     height={100}
                     sizes="100px"

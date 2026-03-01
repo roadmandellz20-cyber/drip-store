@@ -80,9 +80,10 @@ export async function fetchProductInventorySnapshots(slugs?: string[]) {
 }
 
 export async function fetchProductsWithInventory(slugs?: string[]) {
+  const normalizedSlugs = (slugs || []).map((slug) => slug.trim().toLowerCase()).filter(Boolean);
   const baseProducts =
-    slugs && slugs.length > 0
-      ? ALL_PRODUCTS.filter((product) => slugs.includes(product.sku))
+    normalizedSlugs.length > 0
+      ? ALL_PRODUCTS.filter((product) => normalizedSlugs.includes(product.sku.toLowerCase()))
       : ALL_PRODUCTS;
 
   const snapshots = await fetchProductInventorySnapshots(baseProducts.map((product) => product.sku));

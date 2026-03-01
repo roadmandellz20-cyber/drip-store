@@ -76,6 +76,7 @@ export default function CartPage() {
                     src={item.product.imageUrl}
                     fallbackSrc={item.product.imageFallbackUrl}
                     alt={item.product.name}
+                    variant="thumb"
                     width={100}
                     height={100}
                     sizes="100px"

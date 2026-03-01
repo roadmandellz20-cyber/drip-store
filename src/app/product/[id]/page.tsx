@@ -1,9 +1,60 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ProductDetailClient from "./ProductDetailClient";
 import { getProduct } from "@/lib/products";
 import { fetchProductsWithInventory } from "@/lib/products-server";
+import { absoluteUrl, extractSummary } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }> | { id: string };
+}): Promise<Metadata> {
+  const resolvedParams = await params;
+  const product = getProduct(resolvedParams.id);
+
+  if (!product) {
+    return {
+      title: "Product Not Found",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const description = extractSummary(product.description);
+  const image = product.imageFallbackUrl || product.imageUrl;
+  const canonicalPath = `/product/${product.id}`;
+
+  return {
+    title: product.name,
+    description,
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title: product.name,
+      description,
+      url: absoluteUrl(canonicalPath),
+      type: "website",
+      images: [
+        {
+          url: absoluteUrl(image),
+          alt: product.name,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.name,
+      description,
+      images: [absoluteUrl(image)],
+    },
+  };
+}
 
 export default async function ProductDetailPage({
   params,

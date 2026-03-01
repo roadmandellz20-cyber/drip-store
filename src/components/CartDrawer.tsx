@@ -111,6 +111,7 @@ export default function CartDrawer({
                     src={i.product.imageUrl}
                     fallbackSrc={i.product.imageFallbackUrl}
                     alt={i.product.name}
+                    variant="thumb"
                     width={78}
                     height={78}
                     sizes="78px"

@@ -1,6 +1,14 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "About",
+  description: "The archive file behind Mugen District. West African grit, Neo-Tokyo aesthetics, and no mass restocks.",
+  alternates: {
+    canonical: "/about",
+  },
+};
 
 const IG_URL = "https://instagram.com/mugendistrict";
 const WA_URL = "https://wa.me/2203340558";

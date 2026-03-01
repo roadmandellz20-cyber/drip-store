@@ -1,10 +1,38 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import ArchiveFeedTicker from "@/components/ArchiveFeedTicker";
 import LaunchCountdown from "@/components/LaunchCountdown";
+import NewsletterSignup from "@/components/NewsletterSignup";
 import SocialLinks from "@/components/SocialLinks";
 import ProductGrid from "@/components/ProductGrid";
-import { ALL_PRODUCTS } from "@/lib/products";
+import { fetchProductsWithInventory } from "@/lib/products-server";
+import { absoluteUrl, SITE_OG_IMAGE } from "@/lib/site";
 
-export default function ArchivePage() {
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Archive",
+  description: "Enter the archive. Limited drops, no restocks, and the full Mugen District product grid.",
+  alternates: {
+    canonical: "/archive",
+  },
+  openGraph: {
+    title: "MUGEN DISTRICT",
+    description: "Enter the archive. Limited drops, no restocks, and the full Mugen District product grid.",
+    url: absoluteUrl("/archive"),
+    images: [
+      {
+        url: absoluteUrl(SITE_OG_IMAGE),
+        width: 1200,
+        height: 630,
+        alt: "Mugen District Archive",
+      },
+    ],
+  },
+};
+
+export default async function ArchivePage() {
+  const products = await fetchProductsWithInventory();
+
   return (
     <div className="archive">
       <LaunchCountdown />
@@ -52,20 +80,10 @@ export default function ArchivePage() {
           <p className="section__note">Art pieces — not just shirts. Hover to swap to lookbook.</p>
         </div>
 
-        <ProductGrid products={ALL_PRODUCTS} />
+        <ProductGrid products={products} />
       </section>
 
-      <section className="ticker">
-        <div className="ticker__label">ARCHIVE FEED</div>
-        <div className="ticker__track">
-          <div className="ticker__row">
-            ウルキオラ / ULQUIORRA　　黒崎一護 / ICHIGO　　無限地区 / MUGEN DISTRICT　　限定 / LIMITED DROP　　発送 / SHIPS 24–48H　　再入荷なし / NO RESTOCK
-          </div>
-          <div className="ticker__row ticker__row--alt">
-            ルフィ / LUFFY　　黒崎一護 / ICHIGO　　ウルキオラ / ULQUIORRA　　無限地区 / MUGEN DISTRICT　　限定 / LIMITED DROP　　発送 / SHIPS 24–48H　　再入荷なし / NO RESTOCK
-          </div>
-        </div>
-      </section>
+      <ArchiveFeedTicker />
 
       <footer className="footer">
         <div className="footer__grid">
@@ -86,14 +104,7 @@ export default function ArchivePage() {
           </div>
 
           <div className="footer__card">
-            <div className="footer__title">NEWSLETTER</div>
-            <p>Get drops first. No spam.</p>
-            <form className="newsletter">
-              <input className="newsletter__input" placeholder="Email" />
-              <button className="btn btn--primary" type="submit">
-                Join
-              </button>
-            </form>
+            <NewsletterSignup />
           </div>
         </div>
 

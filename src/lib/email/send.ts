@@ -5,6 +5,8 @@ type SendArgs = {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
 };
 
 export type SendEmailResult = {
@@ -46,7 +48,16 @@ function isEmailDebugEnabled() {
 
 function getResendConfig() {
   const apiKey = (process.env.RESEND_API_KEY || "").trim();
-  return { apiKey, from: VERIFIED_FROM };
+  const fromEmail = (process.env.RESEND_FROM_EMAIL || "").trim();
+  const fromName = (process.env.RESEND_FROM_NAME || "").trim() || "Mugen District";
+  const from =
+    fromEmail && fromName ? `${fromName} <${fromEmail}>` : fromEmail || VERIFIED_FROM;
+  const replyTo =
+    (process.env.RESEND_REPLY_TO || "").trim() ||
+    (process.env.ADMIN_ORDER_EMAIL || "").trim() ||
+    "";
+
+  return { apiKey, from, replyTo };
 }
 
 function messageFromResendBody(body: unknown, status: number) {
@@ -75,6 +86,8 @@ async function sendViaResend(args: {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
   debug: boolean;
 }) {
   const response = await fetch("https://api.resend.com/emails", {
@@ -89,6 +102,8 @@ async function sendViaResend(args: {
       subject: args.subject,
       html: args.html,
       text: args.text,
+      reply_to: args.replyTo || undefined,
+      headers: args.headers,
     }),
   });
 
@@ -123,8 +138,15 @@ async function sendViaResend(args: {
   };
 }
 
-export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<SendEmailResult> {
-  const { apiKey, from } = getResendConfig();
+export async function sendEmail({
+  to,
+  subject,
+  html,
+  text,
+  replyTo,
+  headers,
+}: SendArgs): Promise<SendEmailResult> {
+  const { apiKey, from, replyTo: defaultReplyTo } = getResendConfig();
   if (!apiKey) {
     throw new Error("Missing RESEND_API_KEY.");
   }
@@ -137,12 +159,14 @@ export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<
   const primary = await sendViaResend({
     apiKey,
     from,
-    to,
-    subject,
-    html,
-    text,
-    debug,
-  });
+      to,
+      subject,
+      html,
+      text,
+      replyTo: replyTo || defaultReplyTo || undefined,
+      headers,
+      debug,
+    });
 
   if (primary.ok) {
     return { status: primary.status, id: primary.id };

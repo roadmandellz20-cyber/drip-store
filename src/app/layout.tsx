@@ -4,11 +4,41 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FxLayer from "@/components/FxLayer";
 import BackHomeArrow from "@/components/BackHomeArrow";
+import { absoluteUrl, getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE } from "@/lib/site";
 import ToastClient from "./toast.client";
 
 export const metadata: Metadata = {
-  title: "MUGEN DISTRICT",
-  description: "Urban Tokyo Chaos — Archive",
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  alternates: {
+    canonical: "/archive",
+  },
+  openGraph: {
+    type: "website",
+    url: absoluteUrl("/archive"),
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    siteName: SITE_NAME,
+    images: [
+      {
+        url: absoluteUrl(SITE_OG_IMAGE),
+        width: 1200,
+        height: 630,
+        alt: SITE_NAME,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [absoluteUrl(SITE_OG_IMAGE)],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

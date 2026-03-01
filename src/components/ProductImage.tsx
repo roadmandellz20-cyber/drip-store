@@ -1,15 +1,17 @@
 "use client";
 
-import Image, { type ImageLoaderProps, type ImageProps } from "next/image";
+import Image, { type ImageProps } from "next/image";
 import { useEffect, useState } from "react";
 import {
+  getProductDisplaySrc,
+  getProductImageBlurDataUrl,
   getPreferredProductImageSrc,
-  getProductAssetVariantUrl,
 } from "@/lib/product-images";
 
 type ProductImageProps = Omit<ImageProps, "src" | "quality"> & {
   src: string;
   fallbackSrc?: string;
+  variant?: "grid" | "detail" | "thumb";
 };
 
 const PLACEHOLDER_SRC =
@@ -24,26 +26,29 @@ export default function ProductImage({
   src,
   fallbackSrc,
   alt,
+  variant = "grid",
   ...props
 }: ProductImageProps) {
   const safeSrc = toSafeSrc(src);
   const safeFallbackSrc = toSafeSrc(fallbackSrc);
-  const preferredSrc = toSafeSrc(getPreferredProductImageSrc(safeSrc, safeFallbackSrc));
+  const preferredSrc = toSafeSrc(
+    getProductDisplaySrc(toSafeSrc(getPreferredProductImageSrc(safeSrc, safeFallbackSrc)), variant)
+  );
   const [currentSrc, setCurrentSrc] = useState<string>(preferredSrc);
 
   useEffect(() => {
     setCurrentSrc(preferredSrc);
   }, [preferredSrc]);
 
-  const loader = ({ src: imageSrc, width }: ImageLoaderProps) =>
-    getProductAssetVariantUrl(imageSrc, width);
+  const blurDataURL = getProductImageBlurDataUrl();
 
   return (
     <Image
       {...props}
       alt={alt}
-      loader={loader}
-      quality={70}
+      placeholder="blur"
+      blurDataURL={blurDataURL}
+      quality={variant === "detail" ? 82 : variant === "thumb" ? 58 : 72}
       src={currentSrc}
       onError={() => {
         if (currentSrc !== safeSrc) {

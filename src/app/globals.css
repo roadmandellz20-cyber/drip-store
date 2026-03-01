@@ -918,6 +918,16 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   gap:10px;
   margin-bottom:10px;
 }
+.p-card__statusGroup{
+  display:grid;
+  gap:6px;
+}
+.p-card__statusNote{
+  font-size:10px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.58);
+}
 .chip{
   display:inline-flex;
   align-items:center;
@@ -1098,6 +1108,50 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   font-weight:300;
   line-height:1.65;
 }
+.newsletter{
+  display:grid;
+  gap:12px;
+}
+.newsletter__eyebrow{
+  font-family:var(--head);
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.newsletter__copy{
+  margin:0;
+  color:rgba(255,255,255,.72);
+  line-height:1.55;
+}
+.newsletter__controls{
+  display:grid;
+  gap:10px;
+}
+.newsletter__input{
+  width:100%;
+  min-height:48px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.03);
+  color:#fff;
+  padding:12px 14px;
+  font-family:var(--mono);
+  letter-spacing:.06em;
+}
+.newsletter__input::placeholder{
+  color:rgba(255,255,255,.4);
+}
+.newsletter__message{
+  font-size:12px;
+  letter-spacing:.08em;
+}
+.newsletter__message--success{
+  color:#cdebc5;
+}
+.newsletter__message--error{
+  color:#ff8b8b;
+}
+.newsletter__message--loading{
+  color:rgba(255,255,255,.72);
+}
 .footer__title{
   font-family:var(--head);
   letter-spacing:.18em;
@@ -1272,6 +1326,28 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 }
 .size--active{border-color:rgba(255,255,255,.42)}
 .detail__actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:16px}
+.detail__trust{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin-top:18px;
+}
+.detail__trustCard{
+  border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.03);
+  padding:12px;
+}
+.detail__trustCard p{
+  margin:10px 0 0;
+  color:rgba(255,255,255,.78);
+  line-height:1.6;
+  font-size:13px;
+}
+@media (max-width: 620px){
+  .detail__trust{
+    grid-template-columns:1fr;
+  }
+}
 .detail__list ul{margin:10px 0 0; padding-left:18px; color:rgba(255,255,255,.82)}
 .detail__list li{margin:6px 0}
 

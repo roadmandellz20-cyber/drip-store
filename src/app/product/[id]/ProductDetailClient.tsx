@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import ProductImage from "@/components/ProductImage";
 import LaunchCountdown from "@/components/LaunchCountdown";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
+import { trackEvent } from "@/lib/analytics";
 import { addToCart } from "@/lib/cart";
 import { getProductStockText, type Product } from "@/lib/products";
 
@@ -23,6 +24,16 @@ export default function ProductDetailClient({
   const stockText = getProductStockText(product, live);
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
+
+  useEffect(() => {
+    trackEvent("view_product", {
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      limited: product.isLimited,
+      price: product.price,
+    });
+  }, [product.id, product.isLimited, product.name, product.price, product.sku]);
 
   const onAdd = () => {
     if (!live || soldOutUi) return;
@@ -42,6 +53,7 @@ export default function ProductDetailClient({
             src={product.imageUrl}
             fallbackSrc={product.imageFallbackUrl}
             alt={product.name}
+            variant="detail"
             width={1600}
             height={1600}
             priority
@@ -99,6 +111,17 @@ export default function ProductDetailClient({
                 {soldOutUi ? "SOLD OUT" : "LOCKED — Opens April 1"}
               </button>
             )}
+          </div>
+
+          <div className="detail__trust">
+            <div className="detail__trustCard">
+              <div className="detail__label">Size Guide</div>
+              <p>S / M / L / XL. Relaxed street fit with room in the shoulders. Take your normal size.</p>
+            </div>
+            <div className="detail__trustCard">
+              <div className="detail__label">Shipping</div>
+              <p>{live ? "Ships in 24-48h locally once your order clears." : "Drop unlocks April 1. Shipping starts after launch."}</p>
+            </div>
           </div>
 
           <div className="detail__list">

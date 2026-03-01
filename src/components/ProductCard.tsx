@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
 import { warmProductImage } from "@/lib/product-images";
-import { getProductStockText, type Product } from "@/lib/products";
+import { getProductStockText, LIMITED_STOCK_QTY, type Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -41,6 +41,8 @@ export default function ProductCard({
   const soldOutUi = launchLive && product.soldOut;
   const stockText = getProductStockText(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
+  const lockedQty =
+    typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : LIMITED_STOCK_QTY;
 
   const tilt = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -79,7 +81,12 @@ export default function ProductCard({
     >
       <div className="p-card__frame">
         <div className="p-card__status">
-          {product.isLimited ? <span className="chip chip--limited">LIMITED ARCHIVE</span> : null}
+          <div className="p-card__statusGroup">
+            {product.isLimited ? <span className="chip chip--limited">LIMITED ARCHIVE</span> : null}
+            {product.isLimited && !launchLive ? (
+              <span className="p-card__statusNote">{lockedQty} made. Opens April 1.</span>
+            ) : null}
+          </div>
           <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
         </div>
 
@@ -95,6 +102,7 @@ export default function ProductCard({
             src={product.imageUrl}
             fallbackSrc={product.imageFallbackUrl}
             alt={product.name}
+            variant="grid"
             fill
             priority={priority}
             sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
@@ -104,6 +112,7 @@ export default function ProductCard({
             src={product.lookImageUrl}
             fallbackSrc={product.lookImageFallbackUrl}
             alt={`${product.name} lookbook`}
+            variant="grid"
             fill
             sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
           />
