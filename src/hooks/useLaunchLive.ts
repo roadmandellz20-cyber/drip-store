@@ -7,18 +7,13 @@ export function useLaunchLive() {
   const [live, setLive] = useState(() => isLaunchLive());
 
   useEffect(() => {
-    if (live) return;
-
     const t = window.setInterval(() => {
       const next = isLaunchLive();
-      setLive(next);
-      if (next) {
-        window.clearInterval(t);
-      }
+      setLive((current) => (current === next ? current : next));
     }, 1000);
 
     return () => window.clearInterval(t);
-  }, [live]);
+  }, []);
 
   return live;
 }

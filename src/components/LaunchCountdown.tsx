@@ -12,27 +12,19 @@ export default function LaunchCountdown({
 }: {
   variant?: "banner" | "inline";
 }) {
-  const launchDate = useMemo(() => getLaunchDate(), []);
   const [now, setNow] = useState(() => Date.now());
+  const launchDate = useMemo(() => getLaunchDate(new Date(now)), [now]);
 
   useEffect(() => {
-    if (!launchDate) return;
-
     const tick = () => setNow(Date.now());
     tick();
 
-    if (Date.now() >= launchDate.getTime()) return;
-
     const t = window.setInterval(() => {
-      const next = Date.now();
-      setNow(next);
-      if (next >= launchDate.getTime()) {
-        window.clearInterval(t);
-      }
+      setNow(Date.now());
     }, 1000);
 
     return () => window.clearInterval(t);
-  }, [launchDate]);
+  }, []);
 
   if (!launchDate) return null;
 

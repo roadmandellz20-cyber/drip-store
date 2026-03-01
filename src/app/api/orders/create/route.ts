@@ -84,6 +84,12 @@ function buildLaunchEnvPresence() {
     supabase_url: Boolean(asString(process.env.SUPABASE_URL)),
     supabase_anon_key: Boolean(asString(process.env.SUPABASE_ANON_KEY)),
     supabase_service_role_key: Boolean(asString(process.env.SUPABASE_SERVICE_ROLE_KEY)),
+    next_public_force_launch_live: Boolean(asString(process.env.NEXT_PUBLIC_FORCE_LAUNCH_LIVE)),
+    force_launch_live: Boolean(asString(process.env.FORCE_LAUNCH_LIVE)),
+    next_public_force_launch_live_until: Boolean(
+      asString(process.env.NEXT_PUBLIC_FORCE_LAUNCH_LIVE_UNTIL)
+    ),
+    force_launch_live_until: Boolean(asString(process.env.FORCE_LAUNCH_LIVE_UNTIL)),
     resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
     resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
     admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),

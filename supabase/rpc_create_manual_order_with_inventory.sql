@@ -115,21 +115,34 @@ begin
 
   begin
     insert into public.orders (
+      order_number,
+      status,
       customer_name,
       customer_email,
       customer_phone,
       customer_address,
+      shipping_address,
+      note,
       delivery_note,
       total_cents,
+      total_price_cents,
       currency,
       idempotency_key
     )
     values (
+      public.next_order_number(),
+      'pending',
       p_customer_name,
       p_customer_email,
       p_customer_phone,
       p_customer_address,
-      p_delivery_note,
+      case
+        when nullif(btrim(p_customer_address), '') is null then null
+        else jsonb_build_object('formatted', p_customer_address)
+      end,
+      coalesce(nullif(btrim(p_delivery_note), ''), ''),
+      nullif(btrim(p_delivery_note), ''),
+      p_total_cents,
       p_total_cents,
       upper(coalesce(nullif(btrim(p_currency), ''), 'GMD')),
       nullif(btrim(p_idempotency_key), '')
@@ -156,18 +169,26 @@ begin
   insert into public.order_items (
     order_id,
     product_id,
+    product_slug,
     title,
+    unit_price_cents,
     price_cents,
     size,
-    qty
+    qty,
+    line_total_cents,
+    currency
   )
   select
     v_order_id,
     product_id,
+    product_slug,
     title,
     price_cents,
+    price_cents,
     size,
-    qty
+    qty,
+    price_cents * qty,
+    currency
   from _mugen_order_lines;
 
   update public.products p

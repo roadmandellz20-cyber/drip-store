@@ -1,6 +1,4 @@
--- MUGEN DISTRICT: launch repair for checkout RPC visibility in Supabase API
--- Run this in Supabase SQL Editor against production if /rest/v1/rpc/create_manual_order_with_inventory
--- returns PGRST202 (function missing from schema cache).
+-- Align checkout RPC writes with the live orders schema.
 -- Safe to run multiple times.
 
 create sequence if not exists public.order_number_seq
@@ -71,6 +69,10 @@ set order_number = public.next_order_number()
 from ranked r
 where o.id = r.id and r.rn > 1;
 
+create unique index if not exists orders_order_number_unique
+  on public.orders(order_number)
+  where order_number is not null;
+
 update public.orders
 set total_price_cents = coalesce(total_cents, 0)
 where coalesce(total_price_cents, 0) = 0
@@ -84,14 +86,6 @@ where shipping_address is null
 update public.orders
 set note = ''
 where note is null;
-
-create unique index if not exists orders_idempotency_key_unique
-  on public.orders(idempotency_key)
-  where idempotency_key is not null;
-
-create unique index if not exists orders_order_number_unique
-  on public.orders(order_number)
-  where order_number is not null;
 
 create or replace function public.create_manual_order_with_inventory(
   p_customer_name text,
