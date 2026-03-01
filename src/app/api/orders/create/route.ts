@@ -38,16 +38,23 @@ type ProductRow = {
   priceCents: number;
   currency: string;
   isActive: boolean;
+  isLimited: boolean;
+  stockQty: number | null;
+  soldQty: number;
+  available: number | null;
 };
 
 type ValidatedLine = {
   productId: string;
+  productSlug: string;
   title: string;
   unitPriceCents: number;
   qty: number;
   size: string;
   currency: string;
   lineTotalCents: number;
+  isLimited: boolean;
+  remainingQty: number | null;
 };
 
 function asString(value: unknown) {
@@ -101,8 +108,16 @@ function normalizeProduct(row: Record<string, unknown>): ProductRow | null {
     isActiveRaw === undefined || isActiveRaw === null
       ? status !== "ARCHIVED" && status !== "INACTIVE"
       : Boolean(isActiveRaw);
+  const isLimitedRaw = row.is_limited;
+  const isLimited =
+    typeof isLimitedRaw === "boolean" ? isLimitedRaw : status === "LIMITED";
+  const stockQtyRaw = asNumber(row.stock_qty);
+  const stockQty = Number.isFinite(stockQtyRaw) ? Math.max(0, Math.floor(stockQtyRaw)) : null;
+  const soldQtyRaw = asNumber(row.sold_qty);
+  const soldQty = Number.isFinite(soldQtyRaw) ? Math.max(0, Math.floor(soldQtyRaw)) : 0;
+  const available = isLimited ? Math.max(0, (stockQty ?? 0) - soldQty) : null;
 
-  return { id, slug, title, priceCents, currency, isActive };
+  return { id, slug, title, priceCents, currency, isActive, isLimited, stockQty, soldQty, available };
 }
 
 function formatAddress(shipping: IncomingShipping) {
@@ -153,7 +168,7 @@ function makeOrderRef(orderId: string) {
 async function fetchProductsFromSupabase() {
   const primary = await supabaseAdmin
     .from("products")
-    .select("id,slug,title,price_cents,currency,status,is_active")
+    .select("id,slug,title,price_cents,currency,status,is_active,is_limited,stock_qty,sold_qty")
     .order("created_at", { ascending: false });
 
   if (!primary.error) {
@@ -180,6 +195,11 @@ function buildProductLookup(rows: Record<string, unknown>[]) {
     });
 
   return byRef;
+}
+
+function parseOutOfStockMessage(message: string) {
+  if (!message.includes("OUT_OF_STOCK:")) return "";
+  return message.split("OUT_OF_STOCK:")[1]?.trim() || "Insufficient stock.";
 }
 
 async function findExistingOrderByIdempotencyKey(idempotencyKey: string) {
@@ -229,6 +249,8 @@ async function sendOrderEmails(params: {
     lineTotalCents: line.lineTotalCents,
     currency: line.currency,
     size: line.size,
+    limited: line.isLimited,
+    remainingQty: line.remainingQty,
   }));
 
   const payload = {
@@ -409,12 +431,15 @@ export async function POST(request: Request) {
 
       lines.push({
         productId: product.id,
+        productSlug: product.slug,
         title: product.title,
         unitPriceCents: product.priceCents,
         qty,
         size: normalizeSize(item.size),
         currency: product.currency,
         lineTotalCents: product.priceCents * qty,
+        isLimited: product.isLimited,
+        remainingQty: product.isLimited && product.available !== null ? product.available - qty : null,
       });
     }
 
@@ -429,6 +454,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const insufficientLine = lines.find(
+      (line) => line.isLimited && line.remainingQty !== null && line.remainingQty < 0
+    );
+
+    if (insufficientLine) {
+      return NextResponse.json(
+        {
+          error: `Insufficient stock for ${insufficientLine.title}`,
+          code: "OUT_OF_STOCK",
+        },
+        { status: 409 }
+      );
+    }
+
     const totalCents = lines.reduce((sum, line) => sum + line.lineTotalCents, 0);
     if (!Number.isFinite(totalCents) || totalCents <= 0) {
       return NextResponse.json({ error: "Invalid order total." }, { status: 400 });
@@ -438,27 +477,38 @@ export async function POST(request: Request) {
     const shippingAddress = formatAddress(shipping);
     const deliveryNote = asString(shipping.deliveryNote);
 
-    const orderInsert = await supabaseAdmin
-      .from("orders")
-      .insert([
-        {
-          customer_name: asString(shipping.name),
-          customer_email: asString(shipping.email),
-          customer_phone: asString(shipping.phone),
-          customer_address: shippingAddress,
-          delivery_note: deliveryNote,
-          total_cents: totalCents,
-          currency,
-          idempotency_key: idempotencyKey || null,
-        },
-      ])
-      .select("id")
-      .single();
+    const orderCreate = await supabaseAdmin.rpc("create_manual_order_with_inventory", {
+      p_customer_name: asString(shipping.name),
+      p_customer_email: asString(shipping.email),
+      p_customer_phone: asString(shipping.phone),
+      p_customer_address: shippingAddress,
+      p_delivery_note: deliveryNote || null,
+      p_currency: currency,
+      p_total_cents: totalCents,
+      p_idempotency_key: idempotencyKey || null,
+      p_items: lines.map((line) => ({
+        product_id: line.productId,
+        product_slug: line.productSlug,
+        title: line.title,
+        price_cents: line.unitPriceCents,
+        qty: line.qty,
+        size: line.size,
+        currency: line.currency,
+      })),
+    });
 
-    if (orderInsert.error) {
+    if (orderCreate.error) {
+      const outOfStockMessage = parseOutOfStockMessage(orderCreate.error.message);
+      if (outOfStockMessage) {
+        return NextResponse.json(
+          { error: outOfStockMessage, code: "OUT_OF_STOCK" },
+          { status: 409 }
+        );
+      }
+
       const isIdempotencyConflict =
-        /duplicate key/i.test(orderInsert.error.message) &&
-        /idempotency/i.test(orderInsert.error.message);
+        /duplicate key/i.test(orderCreate.error.message) &&
+        /idempotency/i.test(orderCreate.error.message);
 
       if (isIdempotencyConflict && idempotencyKey) {
         const duplicate = await findExistingOrderByIdempotencyKey(idempotencyKey);
@@ -477,32 +527,46 @@ export async function POST(request: Request) {
         }
       }
 
-      throw new Error(orderInsert.error.message);
+      throw new Error(orderCreate.error.message);
     }
 
-    const orderId = asString(orderInsert.data?.id);
+    const rpcRow = Array.isArray(orderCreate.data) ? orderCreate.data[0] : null;
+    const orderId = asString(rpcRow?.order_id);
+    const reusedOrder = Boolean(rpcRow?.reused);
 
     if (!orderId) {
       throw new Error("Order created without id.");
     }
     const orderRef = makeOrderRef(orderId);
 
-    console.log(`[orders/create] inserted order id=${orderId} order_ref=${orderRef}`);
-
-    const orderItemsInsert = await supabaseAdmin.from("order_items").insert(
-      lines.map((line) => ({
+    if (reusedOrder && idempotencyKey) {
+      const existingOrder = await findExistingOrderByIdempotencyKey(idempotencyKey);
+      return NextResponse.json({
+        ok: true,
+        reused: true,
         order_id: orderId,
-        product_id: line.productId,
-        title: line.title,
-        price_cents: line.unitPriceCents,
-        size: line.size,
-        qty: line.qty,
-      }))
-    );
-
-    if (orderItemsInsert.error) {
-      throw new Error(orderItemsInsert.error.message);
+        order_ref: orderRef,
+        email_status: asString(existingOrder?.email_status) || null,
+        email_admin_sent: null,
+        email_customer_sent: null,
+        email_error: asString(existingOrder?.email_error) || null,
+      });
     }
+
+    console.log(`[orders/create] inserted order id=${orderId} order_ref=${orderRef}`);
+    const refreshedProductRows = (await fetchProductsFromSupabase()) as Record<string, unknown>[];
+    const refreshedLookup = buildProductLookup(refreshedProductRows);
+    const emailLines = lines.map((line) => {
+      const refreshed =
+        refreshedLookup.get(line.productId.toLowerCase()) ||
+        refreshedLookup.get(line.productSlug.toLowerCase());
+
+      return {
+        ...line,
+        remainingQty:
+          refreshed?.isLimited && refreshed.available !== null ? refreshed.available : line.remainingQty,
+      };
+    });
 
     console.log("[orders/create] email_env_presence", {
       resend_api_key: !!process.env.RESEND_API_KEY,
@@ -525,7 +589,7 @@ export async function POST(request: Request) {
         shippingAddress,
         currency,
         totalCents,
-        lines,
+        lines: emailLines,
       });
     } catch (error) {
       const message = errorMessage(error);

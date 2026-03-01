@@ -8,12 +8,31 @@ export type Product = {
   lookImageUrl: string;
   lookImageFallbackUrl: string;
   limited: boolean;
+  isLimited: boolean;
+  stockQty: number | null;
+  soldQty: number;
+  available: number | null;
+  availableQty: number | null;
+  soldOut: boolean;
   isNew: boolean;
   category: "all" | "new" | "limited";
   description: string;
   details: string[];
   brandLine: string;
 };
+
+export type ProductInventorySnapshot = {
+  id?: string;
+  slug: string;
+  isLimited?: boolean;
+  stockQty?: number | null;
+  soldQty?: number;
+  available?: number | null;
+  availableQty?: number | null;
+  soldOut?: boolean;
+};
+
+const LIMITED_STOCK_QTY = 10;
 
 const SUPABASE_PRODUCT_IMAGE_BASE = (() => {
   const explicitBase = process.env.NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL?.trim();
@@ -48,14 +67,105 @@ function buildProductImages(sku: string) {
   };
 }
 
-export const PRODUCTS: Product[] = [
+function buildInventoryDefaults(limited: boolean) {
+  return {
+    limited,
+    isLimited: limited,
+    stockQty: limited ? LIMITED_STOCK_QTY : null,
+    soldQty: 0,
+    available: limited ? LIMITED_STOCK_QTY : null,
+    availableQty: limited ? LIMITED_STOCK_QTY : null,
+    soldOut: false,
+  };
+}
+
+function normalizeInt(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : null;
+}
+
+function resolveLimitedFlag(
+  product: Product,
+  snapshot?: ProductInventorySnapshot | Product | null
+) {
+  if (typeof snapshot?.isLimited === "boolean") return snapshot.isLimited;
+  if (typeof product.isLimited === "boolean") return product.isLimited;
+  return Boolean(product.limited);
+}
+
+export function applyProductInventory(
+  product: Product,
+  snapshot?: ProductInventorySnapshot | Product | null
+): Product {
+  const isLimited = resolveLimitedFlag(product, snapshot);
+  const stockQty = isLimited
+    ? normalizeInt(snapshot?.stockQty) ?? normalizeInt(product.stockQty) ?? LIMITED_STOCK_QTY
+    : null;
+  const soldQty = isLimited ? normalizeInt(snapshot?.soldQty) ?? normalizeInt(product.soldQty) ?? 0 : 0;
+  const available =
+    isLimited
+      ? normalizeInt(snapshot?.availableQty) ??
+        normalizeInt(snapshot?.available) ??
+        Math.max(0, (stockQty ?? 0) - soldQty)
+      : null;
+
+  return {
+    ...product,
+    limited: isLimited,
+    isLimited,
+    stockQty,
+    soldQty,
+    available,
+    availableQty: available,
+    soldOut: isLimited && available !== null && available <= 0,
+  };
+}
+
+export function mergeProductInventory(
+  products: Product[],
+  snapshots: Array<ProductInventorySnapshot | Product>
+) {
+  const bySlug = new Map<string, ProductInventorySnapshot | Product>();
+
+  snapshots.forEach((snapshot) => {
+    const key =
+      "slug" in snapshot && typeof snapshot.slug === "string"
+        ? snapshot.slug.toLowerCase()
+        : "sku" in snapshot && typeof snapshot.sku === "string"
+          ? snapshot.sku.toLowerCase()
+          : "";
+    if (key) {
+      bySlug.set(key, snapshot);
+    }
+  });
+
+  return products.map((product) => applyProductInventory(product, bySlug.get(product.sku.toLowerCase())));
+}
+
+export function getProductStockText(
+  product: Pick<Product, "isLimited" | "soldOut" | "available"> & {
+    availableQty?: number | null;
+  }
+) {
+  if (!product.isLimited) return "";
+  if (product.soldOut) return "SOLD OUT";
+  const availableQty = product.availableQty ?? product.available ?? 0;
+  if (availableQty <= 1) return "Final piece";
+  return `Only ${availableQty} left`;
+}
+
+export function isProductSoldOut(product: Pick<Product, "isLimited" | "soldOut">) {
+  return product.isLimited && product.soldOut;
+}
+
+const BASE_PRODUCTS: Product[] = [
   {
     id: "luffy-02",
     sku: "luffy-02",
     name: "Gear 5 Luffy Collage Tee (Black)",
     price: 1500,
     ...buildProductImages("luffy-02"),
-    limited: false,
+    ...buildInventoryDefaults(false),
     isNew: true,
     category: "new",
     description:
@@ -76,7 +186,7 @@ export const PRODUCTS: Product[] = [
     name: "One Piece Legacy Panel Tee (Black)",
     price: 2000,
     ...buildProductImages("luffy-01"),
-    limited: true,
+    ...buildInventoryDefaults(true),
     isNew: false,
     category: "limited",
     description:
@@ -97,7 +207,7 @@ export const PRODUCTS: Product[] = [
     name: "Ichigo Hollow Grunge Tee (White Distressed)",
     price: 2000,
     ...buildProductImages("ichigo-01"),
-    limited: true,
+    ...buildInventoryDefaults(true),
     isNew: true,
     category: "limited",
     description:
@@ -118,7 +228,7 @@ export const PRODUCTS: Product[] = [
     name: "Ulquiorra Segunda Etapa Tee (Black)",
     price: 2000,
     ...buildProductImages("ulquiorra-01"),
-    limited: true,
+    ...buildInventoryDefaults(true),
     isNew: false,
     category: "limited",
     description:
@@ -139,7 +249,7 @@ export const PRODUCTS: Product[] = [
     name: "Tensa Zangetsu Fragment Tee (White Distressed)",
     price: 1500,
     ...buildProductImages("ichigo-02"),
-    limited: false,
+    ...buildInventoryDefaults(false),
     isNew: false,
     category: "all",
     description:
@@ -156,8 +266,14 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
-export const getProduct = (id: string) => PRODUCTS.find((p) => p.id === id);
-
-export const NEW_PRODUCTS = PRODUCTS.filter((p) => p.isNew);
-export const LIMITED_PRODUCTS = PRODUCTS.filter((p) => p.limited);
-export const ALL_PRODUCTS = PRODUCTS;
+export const ALL_PRODUCTS = BASE_PRODUCTS.map((product) => applyProductInventory(product));
+export const getProduct = (id: string) => {
+  const product = ALL_PRODUCTS.find((item) => item.id === id);
+  return product ? applyProductInventory(product) : undefined;
+};
+export const getProductBySku = (sku: string) => {
+  const product = ALL_PRODUCTS.find((item) => item.sku.toLowerCase() === sku.trim().toLowerCase());
+  return product ? applyProductInventory(product) : undefined;
+};
+export const NEW_PRODUCTS = ALL_PRODUCTS.filter((product) => product.isNew);
+export const LIMITED_PRODUCTS = ALL_PRODUCTS.filter((product) => product.isLimited);

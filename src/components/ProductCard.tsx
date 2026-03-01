@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
 import { warmProductImage } from "@/lib/product-images";
-import type { Product } from "@/lib/products";
+import { getProductStockText, type Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -38,7 +38,8 @@ export default function ProductCard({
   const cardRef = useRef<HTMLElement | null>(null);
   const warmedRef = useRef(false);
 
-  const status = product.limited ? "LIMITED" : "AVAILABLE";
+  const stockText = getProductStockText(product);
+  const addDisabled = !launchLive || product.soldOut;
 
   const tilt = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -47,9 +48,11 @@ export default function ProductCard({
   }, [product.id]);
 
   const onCop = () => {
-    if (!launchLive) return;
-    addToCart(product, "M", 1);
-    window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
+    if (addDisabled) return;
+    const result = addToCart(product, "M", 1);
+    if (result.status === "added") {
+      window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
+    }
     triggerCardPulse(cardRef.current);
   };
 
@@ -65,7 +68,7 @@ export default function ProductCard({
   return (
     <article
       ref={cardRef}
-      className={`p-card ${product.limited ? "p-card--limited" : "p-card--available"}`}
+      className={`p-card ${product.isLimited ? "p-card--limited" : "p-card--available"} ${product.soldOut ? "p-card--soldout" : ""}`}
       style={{ transform: `rotate(${tilt}deg)` }}
       onMouseEnter={() => {
         setHover(true);
@@ -75,12 +78,12 @@ export default function ProductCard({
     >
       <div className="p-card__frame">
         <div className="p-card__status">
-          <span className="chip">{status}</span>
+          {product.isLimited ? <span className="chip chip--limited">LIMITED ARCHIVE</span> : null}
           <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
         </div>
 
         <Link
-          className="p-card__imgWrap"
+          className={`p-card__imgWrap ${product.soldOut ? "p-card__imgWrap--soldout" : ""}`}
           href={`/product/${product.id}`}
           aria-label={product.name}
           onTouchStart={warmDetailAssets}
@@ -110,19 +113,27 @@ export default function ProductCard({
         <div className="p-card__meta">
           <div className="p-card__sku">{product.sku}</div>
           <h3 className="p-card__title">{product.name.toUpperCase()}</h3>
+          {product.isLimited ? (
+            <div className={`p-card__scarcity ${product.soldOut ? "p-card__scarcity--soldout" : ""}`}>
+              <div className="p-card__scarcityLabel">LIMITED STOCK</div>
+              <div className={`p-card__stock ${product.soldOut ? "p-card__stock--soldout" : ""}`}>
+                {stockText}
+              </div>
+            </div>
+          ) : null}
           <div className="p-card__brandline">{product.brandLine}</div>
 
           <div className="p-card__row">
             <button
-              className={`btn ${product.limited ? "btn--primary" : "btn--ghost"}`}
+              className={`btn ${product.isLimited ? "btn--primary" : "btn--ghost"}`}
               onClick={(e) => {
                 triggerButtonGlitch(e.currentTarget);
                 onCop();
               }}
               type="button"
-              disabled={!launchLive}
+              disabled={addDisabled}
             >
-              {launchLive ? "COP" : "LOCKED — Opens April 1"}
+              {product.soldOut ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

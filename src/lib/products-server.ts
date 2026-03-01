@@ -1,0 +1,89 @@
+import "server-only";
+
+import { ALL_PRODUCTS, mergeProductInventory, type ProductInventorySnapshot } from "@/lib/products";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function asNumber(value: unknown) {
+  return typeof value === "number" ? value : Number(value);
+}
+
+function normalizeInventoryRow(row: Record<string, unknown>): ProductInventorySnapshot | null {
+  const slug = asString(row.slug) || asString(row.sku);
+  if (!slug) return null;
+
+  const status = asString(row.status).toUpperCase();
+
+  // IMPORTANT:
+  // Only set isLimited when the DB explicitly provides it.
+  // If we default it to false, we will accidentally override baseProducts.isLimited = true.
+  const isLimitedRaw = row.is_limited;
+  const isLimited =
+    typeof isLimitedRaw === "boolean"
+      ? isLimitedRaw
+      : status === "LIMITED"
+        ? true
+        : undefined;
+
+  const stockQtyRaw = asNumber(row.stock_qty);
+  const stockQty = Number.isFinite(stockQtyRaw) ? Math.max(0, Math.floor(stockQtyRaw)) : null;
+
+  const soldQtyRaw = asNumber(row.sold_qty);
+  const soldQty = Number.isFinite(soldQtyRaw) ? Math.max(0, Math.floor(soldQtyRaw)) : 0;
+
+  // Only compute available if the item is actually limited (explicitly).
+  // Otherwise leave it undefined/null and let applyProductInventory handle it.
+  const available =
+    isLimited === true ? Math.max(0, (stockQty ?? 0) - soldQty) : null;
+
+  return {
+    id: asString(row.id) || undefined,
+    slug,
+    isLimited,
+    stockQty,
+    soldQty,
+    available,
+    availableQty: available,
+  } satisfies ProductInventorySnapshot;
+}
+
+export async function fetchProductInventorySnapshots(slugs?: string[]) {
+  const normalizedSlugs = Array.from(
+    new Set((slugs || []).map((slug) => slug.trim().toLowerCase()).filter(Boolean))
+  );
+
+  let primaryQuery = supabaseAdmin
+    .from("products")
+    .select("id,slug,sku,status,is_limited,stock_qty,sold_qty");
+
+  if (normalizedSlugs.length > 0) {
+    primaryQuery = primaryQuery.in("slug", normalizedSlugs);
+  }
+
+  const primary = await primaryQuery;
+
+  const rows = primary.error
+    ? (
+        await (normalizedSlugs.length > 0
+          ? supabaseAdmin.from("products").select("*").in("slug", normalizedSlugs)
+          : supabaseAdmin.from("products").select("*"))
+      ).data || []
+    : primary.data || [];
+
+  return (rows as Record<string, unknown>[])
+    .map((row) => normalizeInventoryRow(row))
+    .filter((row): row is ProductInventorySnapshot => row !== null);
+}
+
+export async function fetchProductsWithInventory(slugs?: string[]) {
+  const baseProducts =
+    slugs && slugs.length > 0
+      ? ALL_PRODUCTS.filter((product) => slugs.includes(product.sku))
+      : ALL_PRODUCTS;
+
+  const snapshots = await fetchProductInventorySnapshots(baseProducts.map((product) => product.sku));
+  return mergeProductInventory(baseProducts, snapshots);
+}

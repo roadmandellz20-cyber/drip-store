@@ -7,14 +7,19 @@ import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductImage from "@/components/ProductImage";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import {
+  getCartInventoryState,
   cartTotal,
   clearCart,
   decQty,
   incQty,
+  persistSyncedCartProducts,
   readCart,
   removeFromCart,
+  syncCartProducts,
   type CartItem,
 } from "@/lib/cart";
+import { useLiveProducts } from "@/hooks/useLiveProducts";
+import { getProductBySku, getProductStockText } from "@/lib/products";
 import { createOrderSuccessSummary, writeOrderSuccessSummary } from "@/lib/order-success";
 
 type ShippingForm = {
@@ -65,6 +70,14 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const live = useLaunchLive();
+  const cartProducts = useMemo(
+    () =>
+      items
+        .map((item) => getProductBySku(item.product.sku))
+        .filter((product): product is NonNullable<typeof product> => Boolean(product)),
+    [items]
+  );
+  const liveProducts = useLiveProducts(cartProducts);
 
   useEffect(() => {
     const sync = () => setItems(readCart());
@@ -81,7 +94,14 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  const total = useMemo(() => cartTotal(items), [items]);
+  useEffect(() => {
+    if (liveProducts.length === 0) return;
+    persistSyncedCartProducts(liveProducts, items);
+  }, [items, liveProducts]);
+
+  const displayItems = useMemo(() => syncCartProducts(liveProducts, items).items, [items, liveProducts]);
+  const total = useMemo(() => cartTotal(displayItems), [displayItems]);
+  const inventoryState = useMemo(() => getCartInventoryState(displayItems), [displayItems]);
 
   async function onPlaceOrder() {
     if (submitting) return;
@@ -90,8 +110,18 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (items.length === 0) {
+    if (displayItems.length === 0) {
       setError("Cart is empty.");
+      return;
+    }
+
+    if (inventoryState === "sold_out") {
+      setError("One or more Limited Archive pieces are sold out.");
+      return;
+    }
+
+    if (inventoryState === "limited_stock") {
+      setError("Limited stock changed. Review your quantities.");
       return;
     }
 
@@ -111,7 +141,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           idempotencyKey,
           shipping,
-          cart: items.map((item) => ({
+          cart: displayItems.map((item) => ({
             productId: item.id,
             slug: item.product.sku,
             qty: item.qty,
@@ -165,7 +195,7 @@ export default function CheckoutPage() {
           currency: "GMD",
           total,
           shipping,
-          items,
+          items: displayItems,
         })
       );
       clearCart();
@@ -188,14 +218,14 @@ export default function CheckoutPage() {
         <p className="page__sub">Review your order. Fill shipping details. Place order.</p>
       </div>
 
-      {items.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div className="empty">
           Cart is empty. <Link className="btn btn--ghost" href="/store">ENTER STORE</Link>
         </div>
       ) : (
         <div className="checkout">
           <div className="checkout__list">
-            {items.map((item) => (
+            {displayItems.map((item) => (
               <div className="checkout__item" key={`${item.id}-${item.size}`}>
                 <ProductImage
                   src={item.product.imageUrl}
@@ -209,6 +239,11 @@ export default function CheckoutPage() {
                 <div className="checkout__meta">
                   <div className="checkout__sku">{item.product.sku}</div>
                   <div className="checkout__name">{item.product.name}</div>
+                  {item.product.isLimited ? (
+                    <div className={`checkout__stock ${item.product.soldOut ? "checkout__stock--soldout" : ""}`}>
+                      {getProductStockText(item.product)}
+                    </div>
+                  ) : null}
                   <div className="checkout__row">
                     <span>Size: {item.size}</span>
                     <div className="checkout__qty">
@@ -234,6 +269,12 @@ export default function CheckoutPage() {
                           triggerButtonGlitch(e.currentTarget);
                           setItems(incQty(item.id, item.size));
                         }}
+                        disabled={
+                          item.product.soldOut ||
+                          (item.product.isLimited &&
+                            item.product.available !== null &&
+                            item.qty >= item.product.available)
+                        }
                       >
                         +
                       </button>
@@ -381,9 +422,17 @@ export default function CheckoutPage() {
                 void onPlaceOrder();
               }}
               type="button"
-              disabled={submitting || !live}
+              disabled={submitting || !live || inventoryState !== "ok"}
             >
-              {submitting ? "PROCESSING..." : live ? "PLACE ORDER" : "LOCKED — Opens April 1"}
+              {submitting
+                ? "PROCESSING..."
+                : inventoryState === "sold_out"
+                  ? "SOLD OUT"
+                  : inventoryState === "limited_stock"
+                    ? "LIMITED STOCK"
+                    : live
+                      ? "PLACE ORDER"
+                      : "LOCKED — Opens April 1"}
             </button>
 
             {error ? <div className="checkout__error">{error}</div> : null}

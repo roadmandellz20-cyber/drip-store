@@ -9,6 +9,8 @@ export type EmailOrderItem = {
   lineTotalCents: number;
   currency: string;
   size?: string;
+  limited?: boolean;
+  remainingQty?: number | null;
   // Optional: if you ever pass it in later, we'll use it (safe fallback).
   imageUrl?: string;
 };
@@ -65,10 +67,13 @@ function orderItemsText(items: EmailOrderItem[]) {
   return items
     .map((it) => {
       const size = (it.size || "M").toUpperCase();
+      const limitedNote = it.limited
+        ? `\n  Limited Archive piece confirmed${typeof it.remainingQty === "number" ? ` — ${it.remainingQty} left` : ""}`
+        : "";
       return `- ${it.title} (Size ${size}) x${it.qty} — ${formatMoney(
         it.lineTotalCents,
         it.currency
-      )}`;
+      )}${limitedNote}`;
     })
     .join("\n");
 }
@@ -192,6 +197,13 @@ function renderOrderTable(params: {
             <div style="margin-top:6px;font-size:12px;line-height:1.4;color:rgba(255,255,255,0.72);">
               Size: ${esc(size)} • Qty: ${esc(it.qty)}
             </div>
+            ${
+              it.limited
+                ? `<div style="margin-top:6px;font-size:12px;line-height:1.4;color:#ffffff;">
+              Limited Archive piece confirmed${typeof it.remainingQty === "number" ? ` • ${esc(it.remainingQty)} left` : ""}
+            </div>`
+                : ""
+            }
           </td>
           <td align="right" style="padding:14px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;">
             <div style="font-weight:900;font-size:14px;">${esc(
@@ -240,6 +252,7 @@ function renderOrderTable(params: {
 }
 
 function renderCustomerBody(payload: OrderEmailPayload) {
+  const hasLimitedPiece = payload.items.some((item) => item.limited);
   const orderLine = `<div style="margin-top:18px;">
     <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Order</div>
     <div style="margin-top:6px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;font-size:15px;line-height:1.35;">
@@ -254,6 +267,7 @@ function renderCustomerBody(payload: OrderEmailPayload) {
       </div>
       <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
         Your order has been archived successfully.<br/>
+        ${hasLimitedPiece ? "Limited Archive piece confirmed.<br/>" : ""}
         You will be contacted shortly to complete payment and delivery.
       </div>
     </div>
