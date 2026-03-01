@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendEmail } from "@/lib/email/send";
+import { ResendRequestError, sendEmail } from "@/lib/email/send";
 import { getSiteUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
@@ -10,6 +10,24 @@ function asString(value: unknown) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function asBooleanFlag(value: unknown) {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error && error.message.trim()
+    ? error.message
+    : "Newsletter signup failed.";
+}
+
+function isResendTestingRestriction(error: unknown) {
+  if (!(error instanceof ResendRequestError)) return false;
+  const message = errorMessage(error).toLowerCase();
+  return message.includes("testing emails") || message.includes("verify a domain");
 }
 
 function newsletterAdminHtml(email: string) {
@@ -51,6 +69,11 @@ export async function POST(request: Request) {
     const adminEmail =
       asString(process.env.NEWSLETTER_NOTIFY_EMAIL) ||
       asString(process.env.ADMIN_ORDER_EMAIL);
+    const resendDomainVerified = asBooleanFlag(process.env.RESEND_DOMAIN_VERIFIED);
+    const customerAllowedInTestMode =
+      !!adminEmail && email.toLowerCase() === adminEmail.toLowerCase();
+    const shouldSendCustomer = resendDomainVerified || customerAllowedInTestMode;
+    let confirmationSent = false;
 
     if (adminEmail) {
       await sendEmail({
@@ -64,27 +87,60 @@ export async function POST(request: Request) {
       console.log("[newsletter] signup", { email });
     }
 
-    if ((process.env.RESEND_DOMAIN_VERIFIED || "").trim().toLowerCase() === "true") {
+    if (!shouldSendCustomer) {
+      console.log(
+        "[newsletter] customer confirmation skipped: domain not verified and recipient is not admin email"
+      );
+    } else {
       const unsubscribeAddress =
         asString(process.env.RESEND_REPLY_TO) ||
         adminEmail ||
         "support@mugendistrict.com";
 
-      await sendEmail({
-        to: email,
-        subject: "DROP SIGNAL CONFIRMED",
-        html: newsletterCustomerHtml(email),
-        text: "You're in. Watch your inbox.",
-        replyTo: unsubscribeAddress,
-        headers: {
-          "List-Unsubscribe": `<mailto:${unsubscribeAddress}?subject=unsubscribe>, <${getSiteUrl()}/about>`,
-        },
-      });
+      try {
+        await sendEmail({
+          to: email,
+          subject: "DROP SIGNAL CONFIRMED",
+          html: newsletterCustomerHtml(email),
+          text: "You're in. Watch your inbox.",
+          replyTo: unsubscribeAddress,
+          headers: {
+            "List-Unsubscribe": `<mailto:${unsubscribeAddress}?subject=unsubscribe>, <${getSiteUrl()}/about>`,
+          },
+        });
+        confirmationSent = true;
+      } catch (error) {
+        if (isResendTestingRestriction(error)) {
+          console.warn("[newsletter] customer confirmation suppressed by Resend test-mode policy", {
+            email,
+            resend_domain_verified: resendDomainVerified,
+          });
+        } else {
+          console.error(`[newsletter] customer confirmation failed: ${errorMessage(error)}`);
+        }
+      }
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+      ok: true,
+      message: confirmationSent ? "You're in. Watch your inbox." : "You're in.",
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Newsletter signup failed.";
+    if (error instanceof ResendRequestError) {
+      console.error("[newsletter] resend request failed", {
+        status: error.status,
+        body: error.body,
+        from: error.from,
+        to: error.to,
+        subject: error.subject,
+      });
+      return NextResponse.json(
+        { ok: false, error: "Signup failed. Try again in a minute." },
+        { status: 502 }
+      );
+    }
+
+    const message = errorMessage(error);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

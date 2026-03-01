@@ -33,14 +33,18 @@ export default function NewsletterSignup() {
         body: JSON.stringify({ email: normalized }),
       });
 
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+      };
       if (!response.ok || data.ok !== true) {
         throw new Error(data.error || "Newsletter signup failed.");
       }
 
       setEmail("");
       setStatus("success");
-      setMessage("You're in. Watch your inbox.");
+      setMessage(data.message || "You're in.");
     } catch (error) {
       setStatus("error");
       setMessage(
