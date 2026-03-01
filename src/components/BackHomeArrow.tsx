@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function BackHomeArrow() {
+  const router = useRouter();
   const pathname = usePathname();
   const isHome = pathname === "/" || pathname === "/archive";
 
@@ -12,14 +12,22 @@ export default function BackHomeArrow() {
   }
 
   return (
-    <Link
+    <button
+      type="button"
       className="btn btn--ghost back-home-arrow"
-      href="/archive"
-      aria-label="Back to home"
-      title="Back to home"
+      aria-label="Go back"
+      title="Go back"
+      onClick={() => {
+        if (window.history.length > 1) {
+          router.back();
+          return;
+        }
+
+        router.push("/archive");
+      }}
     >
       <span aria-hidden="true">←</span>
       <span>Back</span>
-    </Link>
+    </button>
   );
 }
