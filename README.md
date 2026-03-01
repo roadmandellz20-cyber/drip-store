@@ -80,6 +80,12 @@ Keep website DNS and email DNS separate to avoid SSL or delivery regressions.
 - API returns `{ order_id: "..." }`.
 - Frontend redirects to `/success?order_id=...`.
 
+## Newsletter Signup Flow
+
+- Frontend submits email to `POST /api/newsletter`.
+- Backend persists the signup in `public.waitlist` with `source='newsletter'`.
+- Admin/customer emails are best-effort and do not block the signup once persistence succeeds.
+
 ## Migrations
 
 Run SQL files in `supabase/migrations/` in order, then run `migrate_orders.sql` in Supabase SQL Editor for schema-cache-safe alignment.

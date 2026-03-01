@@ -19,15 +19,62 @@ function asBooleanFlag(value: unknown) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error && error.message.trim()
-    ? error.message
-    : "Newsletter signup failed.";
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (error && typeof error === "object") {
+    const message = "message" in error ? asString(error.message) : "";
+    const details = "details" in error ? asString(error.details) : "";
+    const hint = "hint" in error ? asString(error.hint) : "";
+
+    return message || details || hint || "Newsletter signup failed.";
+  }
+
+  return "Newsletter signup failed.";
 }
 
 function isResendTestingRestriction(error: unknown) {
   if (!(error instanceof ResendRequestError)) return false;
   const message = errorMessage(error).toLowerCase();
   return message.includes("testing emails") || message.includes("verify a domain");
+}
+
+async function loadSupabaseAdmin() {
+  try {
+    const mod = await import("@/lib/supabase-admin");
+    return mod.supabaseAdmin;
+  } catch (error) {
+    throw new Error(errorMessage(error));
+  }
+}
+
+async function persistNewsletterSignup(email: string) {
+  const supabaseAdmin = await loadSupabaseAdmin();
+  const { error } = await supabaseAdmin.from("waitlist").insert({
+    contact: email,
+    source: "newsletter",
+    product_sku: null,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+function logEmailFailure(kind: "admin" | "customer", error: unknown) {
+  if (error instanceof ResendRequestError) {
+    console.error(`[newsletter] ${kind} email failed`, {
+      status: error.status,
+      body: error.body,
+      from: error.from,
+      to: error.to,
+      subject: error.subject,
+    });
+    return;
+  }
+
+  console.error(`[newsletter] ${kind} email failed: ${errorMessage(error)}`);
 }
 
 function newsletterAdminHtml(email: string) {
@@ -66,6 +113,8 @@ export async function POST(request: Request) {
       );
     }
 
+    await persistNewsletterSignup(email);
+
     const adminEmail =
       asString(process.env.NEWSLETTER_NOTIFY_EMAIL) ||
       asString(process.env.ADMIN_ORDER_EMAIL);
@@ -76,13 +125,17 @@ export async function POST(request: Request) {
     let confirmationSent = false;
 
     if (adminEmail) {
-      await sendEmail({
-        to: adminEmail,
-        subject: `DROP SIGNAL signup — ${email}`,
-        html: newsletterAdminHtml(email),
-        text: `New DROP SIGNAL signup: ${email}`,
-        replyTo: email,
-      });
+      try {
+        await sendEmail({
+          to: adminEmail,
+          subject: `DROP SIGNAL signup — ${email}`,
+          html: newsletterAdminHtml(email),
+          text: `New DROP SIGNAL signup: ${email}`,
+          replyTo: email,
+        });
+      } catch (error) {
+        logEmailFailure("admin", error);
+      }
     } else {
       console.log("[newsletter] signup", { email });
     }
@@ -116,7 +169,7 @@ export async function POST(request: Request) {
             resend_domain_verified: resendDomainVerified,
           });
         } else {
-          console.error(`[newsletter] customer confirmation failed: ${errorMessage(error)}`);
+          logEmailFailure("customer", error);
         }
       }
     }
@@ -126,21 +179,10 @@ export async function POST(request: Request) {
       message: confirmationSent ? "You're in. Watch your inbox." : "You're in.",
     });
   } catch (error) {
-    if (error instanceof ResendRequestError) {
-      console.error("[newsletter] resend request failed", {
-        status: error.status,
-        body: error.body,
-        from: error.from,
-        to: error.to,
-        subject: error.subject,
-      });
-      return NextResponse.json(
-        { ok: false, error: "Signup failed. Try again in a minute." },
-        { status: 502 }
-      );
-    }
-
-    const message = errorMessage(error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    console.error(`[newsletter] persistence failed: ${errorMessage(error)}`);
+    return NextResponse.json(
+      { ok: false, error: "Signup failed. Try again in a minute." },
+      { status: 500 }
+    );
   }
 }
