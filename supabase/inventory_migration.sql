@@ -19,7 +19,7 @@ set sold_qty = coalesce(sold_qty, 0);
 update public.products
 set
   is_limited = true,
-  stock_qty = 10,
+  stock_qty = 7,
   sold_qty = coalesce(sold_qty, 0)
 where slug in ('ulquiorra-01', 'luffy-01', 'ichigo-01');
 

@@ -1,3 +1,9 @@
+update public.products
+set
+  stock_qty = 7,
+  sold_qty = coalesce(sold_qty, 0)
+where coalesce(is_limited, false);
+
 create or replace function public.create_manual_order_with_inventory(
   p_customer_name text,
   p_customer_email text,

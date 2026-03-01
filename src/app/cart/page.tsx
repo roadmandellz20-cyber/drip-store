@@ -66,50 +66,55 @@ export default function CartPage() {
       ) : (
         <div className="checkout">
           <div className="checkout__list">
-            {displayItems.map((item) => (
-              <div className="checkout__item" key={`${item.id}-${item.size}`}>
-                <ProductImage
-                  src={item.product.imageUrl}
-                  fallbackSrc={item.product.imageFallbackUrl}
-                  alt={item.product.name}
-                  width={100}
-                  height={100}
-                  sizes="100px"
-                />
-                <div className="checkout__meta">
-                  <div className="checkout__sku">{item.product.sku}</div>
-                  <div className="checkout__name">{item.product.name}</div>
-                  {item.product.isLimited ? (
-                    <div className={`checkout__stock ${item.product.soldOut ? "checkout__stock--soldout" : ""}`}>
-                      {getProductStockText(item.product)}
-                    </div>
-                  ) : null}
-                  <div className="checkout__row checkout__row--actions">
-                    <span>Size: {item.size}</span>
-                    <div className="checkout__qty">
-                      <button className="btn btn--ghost" onClick={() => setItems(decQty(item.id, item.size))}>-</button>
-                      <span className="checkout__qtyval">{item.qty}</span>
-                      <button
-                        className="btn btn--ghost"
-                        onClick={() => setItems(incQty(item.id, item.size))}
-                        disabled={
-                          item.product.soldOut ||
-                          (item.product.isLimited &&
-                            item.product.available !== null &&
-                            item.qty >= item.product.available)
-                        }
-                      >
-                        +
+            {displayItems.map((item) => {
+              const showSoldOut = live && item.product.soldOut;
+              const stockText = getProductStockText(item.product, live);
+
+              return (
+                <div className="checkout__item" key={`${item.id}-${item.size}`}>
+                  <ProductImage
+                    src={item.product.imageUrl}
+                    fallbackSrc={item.product.imageFallbackUrl}
+                    alt={item.product.name}
+                    width={100}
+                    height={100}
+                    sizes="100px"
+                  />
+                  <div className="checkout__meta">
+                    <div className="checkout__sku">{item.product.sku}</div>
+                    <div className="checkout__name">{item.product.name}</div>
+                    {item.product.isLimited ? (
+                      <div className={`checkout__stock ${showSoldOut ? "checkout__stock--soldout" : ""}`}>
+                        {stockText || "DROPS APRIL 1"}
+                      </div>
+                    ) : null}
+                    <div className="checkout__row checkout__row--actions">
+                      <span>Size: {item.size}</span>
+                      <div className="checkout__qty">
+                        <button className="btn btn--ghost" onClick={() => setItems(decQty(item.id, item.size))}>-</button>
+                        <span className="checkout__qtyval">{item.qty}</span>
+                        <button
+                          className="btn btn--ghost"
+                          onClick={() => setItems(incQty(item.id, item.size))}
+                          disabled={
+                            showSoldOut ||
+                            (item.product.isLimited &&
+                              item.product.available !== null &&
+                              item.qty >= item.product.available)
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
+                      <button className="btn btn--ghost" onClick={() => setItems(removeFromCart(item.id, item.size))}>
+                        REMOVE
                       </button>
                     </div>
-                    <button className="btn btn--ghost" onClick={() => setItems(removeFromCart(item.id, item.size))}>
-                      REMOVE
-                    </button>
                   </div>
+                  <div className="checkout__price">GMD {(item.product.price * item.qty).toLocaleString()}</div>
                 </div>
-                <div className="checkout__price">GMD {(item.product.price * item.qty).toLocaleString()}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="checkout__side">
@@ -123,11 +128,11 @@ export default function CartPage() {
               </Link>
             ) : (
               <button className="btn btn--primary" type="button" disabled>
-                {inventoryState === "sold_out"
-                  ? "SOLD OUT"
-                  : inventoryState === "limited_stock"
-                    ? "LIMITED STOCK"
-                    : "LOCKED — Opens April 1"}
+                {!live
+                  ? "LOCKED — Opens April 1"
+                  : inventoryState === "sold_out"
+                    ? "SOLD OUT"
+                    : "LIMITED STOCK"}
               </button>
             )}
             <Link className="btn btn--ghost" href="/archive">BACK TO ARCHIVE</Link>

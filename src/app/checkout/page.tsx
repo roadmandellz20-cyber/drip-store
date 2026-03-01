@@ -225,80 +225,85 @@ export default function CheckoutPage() {
       ) : (
         <div className="checkout">
           <div className="checkout__list">
-            {displayItems.map((item) => (
-              <div className="checkout__item" key={`${item.id}-${item.size}`}>
-                <ProductImage
-                  src={item.product.imageUrl}
-                  fallbackSrc={item.product.imageFallbackUrl}
-                  alt={item.product.name}
-                  width={100}
-                  height={100}
-                  sizes="100px"
-                />
+            {displayItems.map((item) => {
+              const showSoldOut = live && item.product.soldOut;
+              const stockText = getProductStockText(item.product, live);
 
-                <div className="checkout__meta">
-                  <div className="checkout__sku">{item.product.sku}</div>
-                  <div className="checkout__name">{item.product.name}</div>
-                  {item.product.isLimited ? (
-                    <div className={`checkout__stock ${item.product.soldOut ? "checkout__stock--soldout" : ""}`}>
-                      {getProductStockText(item.product)}
+              return (
+                <div className="checkout__item" key={`${item.id}-${item.size}`}>
+                  <ProductImage
+                    src={item.product.imageUrl}
+                    fallbackSrc={item.product.imageFallbackUrl}
+                    alt={item.product.name}
+                    width={100}
+                    height={100}
+                    sizes="100px"
+                  />
+
+                  <div className="checkout__meta">
+                    <div className="checkout__sku">{item.product.sku}</div>
+                    <div className="checkout__name">{item.product.name}</div>
+                    {item.product.isLimited ? (
+                      <div className={`checkout__stock ${showSoldOut ? "checkout__stock--soldout" : ""}`}>
+                        {stockText || "DROPS APRIL 1"}
+                      </div>
+                    ) : null}
+                    <div className="checkout__row">
+                      <span>Size: {item.size}</span>
+                      <div className="checkout__qty">
+                        <button
+                          className="btn btn--ghost"
+                          type="button"
+                          aria-label="Decrease quantity"
+                          onClick={(e) => {
+                            triggerButtonGlitch(e.currentTarget);
+                            setItems(decQty(item.id, item.size));
+                          }}
+                        >
+                          -
+                        </button>
+
+                        <span className="checkout__qtyval">{item.qty}</span>
+
+                        <button
+                          className="btn btn--ghost"
+                          type="button"
+                          aria-label="Increase quantity"
+                          onClick={(e) => {
+                            triggerButtonGlitch(e.currentTarget);
+                            setItems(incQty(item.id, item.size));
+                          }}
+                          disabled={
+                            showSoldOut ||
+                            (item.product.isLimited &&
+                              item.product.available !== null &&
+                              item.qty >= item.product.available)
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-                  ) : null}
-                  <div className="checkout__row">
-                    <span>Size: {item.size}</span>
-                    <div className="checkout__qty">
+
+                    <div className="checkout__row checkout__row--actions">
+                      <span className="checkout__unit">GMD {item.product.price.toLocaleString()}</span>
                       <button
                         className="btn btn--ghost"
                         type="button"
-                        aria-label="Decrease quantity"
                         onClick={(e) => {
                           triggerButtonGlitch(e.currentTarget);
-                          setItems(decQty(item.id, item.size));
+                          setItems(removeFromCart(item.id, item.size));
                         }}
                       >
-                        -
-                      </button>
-
-                      <span className="checkout__qtyval">{item.qty}</span>
-
-                      <button
-                        className="btn btn--ghost"
-                        type="button"
-                        aria-label="Increase quantity"
-                        onClick={(e) => {
-                          triggerButtonGlitch(e.currentTarget);
-                          setItems(incQty(item.id, item.size));
-                        }}
-                        disabled={
-                          item.product.soldOut ||
-                          (item.product.isLimited &&
-                            item.product.available !== null &&
-                            item.qty >= item.product.available)
-                        }
-                      >
-                        +
+                        REMOVE
                       </button>
                     </div>
                   </div>
 
-                  <div className="checkout__row checkout__row--actions">
-                    <span className="checkout__unit">GMD {item.product.price.toLocaleString()}</span>
-                    <button
-                      className="btn btn--ghost"
-                      type="button"
-                      onClick={(e) => {
-                        triggerButtonGlitch(e.currentTarget);
-                        setItems(removeFromCart(item.id, item.size));
-                      }}
-                    >
-                      REMOVE
-                    </button>
-                  </div>
+                  <div className="checkout__price">GMD {(item.product.price * item.qty).toLocaleString()}</div>
                 </div>
-
-                <div className="checkout__price">GMD {(item.product.price * item.qty).toLocaleString()}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="checkout__side">
@@ -426,13 +431,13 @@ export default function CheckoutPage() {
             >
               {submitting
                 ? "PROCESSING..."
-                : inventoryState === "sold_out"
-                  ? "SOLD OUT"
-                  : inventoryState === "limited_stock"
-                    ? "LIMITED STOCK"
-                    : live
-                      ? "PLACE ORDER"
-                      : "LOCKED — Opens April 1"}
+                : !live
+                  ? "LOCKED — Opens April 1"
+                  : inventoryState === "sold_out"
+                    ? "SOLD OUT"
+                    : inventoryState === "limited_stock"
+                      ? "LIMITED STOCK"
+                      : "PLACE ORDER"}
             </button>
 
             {error ? <div className="checkout__error">{error}</div> : null}

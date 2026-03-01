@@ -1,5 +1,5 @@
 import type { Product } from "./products";
-import { getProduct, isProductSoldOut } from "./products";
+import { getProduct, isProductSoldOut, LIMITED_STOCK_QTY } from "./products";
 
 export type CartItem = {
   id: string;
@@ -112,13 +112,14 @@ function normalizeCartItem(item: Record<string, unknown>): CartItem | null {
   const stockQty =
     typeof product.stockQty === "number"
       ? product.stockQty
-      : catalogProduct?.stockQty ?? (isLimited ? 10 : null);
+      : catalogProduct?.stockQty ?? (isLimited ? LIMITED_STOCK_QTY : null);
   const soldQty =
     typeof product.soldQty === "number" ? product.soldQty : catalogProduct?.soldQty || 0;
   const available =
     typeof product.available === "number"
       ? product.available
-      : catalogProduct?.available ?? (isLimited ? Math.max(0, (stockQty ?? 0) - soldQty) : null);
+      : catalogProduct?.available ??
+        (isLimited && stockQty !== null ? Math.max(0, stockQty - soldQty) : null);
   const soldOut =
     typeof product.soldOut === "boolean"
       ? product.soldOut
@@ -353,9 +354,10 @@ export function getCartInventoryState(items: CartItem[]) {
 
   for (const item of items) {
     if (!item.product.isLimited) continue;
-    const available = item.product.available ?? 0;
-    if (available <= 0 || item.product.soldOut) return "sold_out" as const;
-    if (item.qty > available) hasLimitedMismatch = true;
+    const available = item.product.available;
+    if (item.product.soldOut) return "sold_out" as const;
+    if (available !== null && available <= 0) return "sold_out" as const;
+    if (available !== null && item.qty > available) hasLimitedMismatch = true;
   }
 
   return hasLimitedMismatch ? ("limited_stock" as const) : ("ok" as const);

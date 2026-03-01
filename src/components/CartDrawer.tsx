@@ -100,75 +100,80 @@ export default function CartDrawer({
           </div>
         ) : (
           <div className="drawer__list">
-            {displayItems.map((i) => (
-              <div className="cart-item" key={`${i.id}-${i.size}`}>
-                <ProductImage
-                  className="cart-item__img"
-                  src={i.product.imageUrl}
-                  fallbackSrc={i.product.imageFallbackUrl}
-                  alt={i.product.name}
-                  width={78}
-                  height={78}
-                  sizes="78px"
-                />
-                <div className="cart-item__meta">
-                  <div className="cart-item__sku">{i.product.sku}</div>
-                  <div className="cart-item__name">{i.product.name}</div>
-                  {i.product.isLimited ? (
-                    <div className={`checkout__stock ${i.product.soldOut ? "checkout__stock--soldout" : ""}`}>
-                      {getProductStockText(i.product)}
+            {displayItems.map((i) => {
+              const showSoldOut = live && i.product.soldOut;
+              const stockText = getProductStockText(i.product, live);
+
+              return (
+                <div className="cart-item" key={`${i.id}-${i.size}`}>
+                  <ProductImage
+                    className="cart-item__img"
+                    src={i.product.imageUrl}
+                    fallbackSrc={i.product.imageFallbackUrl}
+                    alt={i.product.name}
+                    width={78}
+                    height={78}
+                    sizes="78px"
+                  />
+                  <div className="cart-item__meta">
+                    <div className="cart-item__sku">{i.product.sku}</div>
+                    <div className="cart-item__name">{i.product.name}</div>
+                    {i.product.isLimited ? (
+                      <div className={`checkout__stock ${showSoldOut ? "checkout__stock--soldout" : ""}`}>
+                        {stockText || "DROPS APRIL 1"}
+                      </div>
+                    ) : null}
+                    <div className="cart-item__row">
+                      <span>Size: {i.size}</span>
+                      <div className="cart-item__qty">
+                        <button
+                          className="cart-item__qtybtn"
+                          type="button"
+                          aria-label="Decrease quantity"
+                          onClick={(e) => {
+                            triggerButtonGlitch(e.currentTarget);
+                            onDec(i.id, i.size);
+                          }}
+                        >
+                          -
+                        </button>
+                        <span className="cart-item__qtyval">{i.qty}</span>
+                        <button
+                          className="cart-item__qtybtn"
+                          type="button"
+                          aria-label="Increase quantity"
+                          onClick={(e) => {
+                            triggerButtonGlitch(e.currentTarget);
+                            onInc(i.id, i.size);
+                          }}
+                          disabled={
+                            showSoldOut ||
+                            (i.product.isLimited &&
+                              i.product.available !== null &&
+                              i.qty >= i.product.available)
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
-                  ) : null}
-                  <div className="cart-item__row">
-                    <span>Size: {i.size}</span>
-                    <div className="cart-item__qty">
+                    <div className="cart-item__row">
+                      <span className="cart-item__price">GMD {i.product.price.toLocaleString()}</span>
                       <button
-                        className="cart-item__qtybtn"
+                        className="cart-item__remove"
                         type="button"
-                        aria-label="Decrease quantity"
                         onClick={(e) => {
                           triggerButtonGlitch(e.currentTarget);
-                          onDec(i.id, i.size);
+                          onRemove(i.id, i.size);
                         }}
                       >
-                        -
-                      </button>
-                      <span className="cart-item__qtyval">{i.qty}</span>
-                      <button
-                        className="cart-item__qtybtn"
-                        type="button"
-                        aria-label="Increase quantity"
-                        onClick={(e) => {
-                          triggerButtonGlitch(e.currentTarget);
-                          onInc(i.id, i.size);
-                        }}
-                        disabled={
-                          i.product.soldOut ||
-                          (i.product.isLimited &&
-                            i.product.available !== null &&
-                            i.qty >= i.product.available)
-                        }
-                      >
-                        +
+                        remove
                       </button>
                     </div>
-                  </div>
-                  <div className="cart-item__row">
-                    <span className="cart-item__price">GMD {i.product.price.toLocaleString()}</span>
-                    <button
-                      className="cart-item__remove"
-                      type="button"
-                      onClick={(e) => {
-                        triggerButtonGlitch(e.currentTarget);
-                        onRemove(i.id, i.size);
-                      }}
-                    >
-                      remove
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -183,11 +188,11 @@ export default function CartDrawer({
             </Link>
           ) : (
             <button className="btn btn--primary" type="button" disabled>
-              {inventoryState === "sold_out"
-                ? "SOLD OUT"
-                : inventoryState === "limited_stock"
-                  ? "LIMITED STOCK"
-                  : "LOCKED — Opens April 1"}
+              {!live
+                ? "LOCKED — Opens April 1"
+                : inventoryState === "sold_out"
+                  ? "SOLD OUT"
+                  : "LIMITED STOCK"}
             </button>
           )}
         </div>

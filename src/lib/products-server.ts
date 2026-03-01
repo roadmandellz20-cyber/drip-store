@@ -34,20 +34,21 @@ function normalizeInventoryRow(row: Record<string, unknown>): ProductInventorySn
   const soldQtyRaw = asNumber(row.sold_qty);
   const soldQty = Number.isFinite(soldQtyRaw) ? Math.max(0, Math.floor(soldQtyRaw)) : 0;
 
-  // Only compute available if the item is actually limited (explicitly).
-  // Otherwise leave it undefined/null and let applyProductInventory handle it.
-  const available =
-    isLimited === true ? Math.max(0, (stockQty ?? 0) - soldQty) : null;
-
-  return {
+  const snapshot: ProductInventorySnapshot = {
     id: asString(row.id) || undefined,
     slug,
     isLimited,
     stockQty,
     soldQty,
-    available,
-    availableQty: available,
-  } satisfies ProductInventorySnapshot;
+  };
+
+  if (isLimited === true && stockQty !== null) {
+    const available = Math.max(0, stockQty - soldQty);
+    snapshot.available = available;
+    snapshot.availableQty = available;
+  }
+
+  return snapshot;
 }
 
 export async function fetchProductInventorySnapshots(slugs?: string[]) {

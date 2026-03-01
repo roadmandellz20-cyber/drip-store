@@ -18,13 +18,14 @@ export default function ProductDetailClient({
   const live = useLaunchLive();
   const [liveProduct] = useLiveProducts([initialProduct]);
   const product = liveProduct || initialProduct;
-  const addDisabled = !live || product.soldOut;
-  const stockText = getProductStockText(product);
+  const soldOutUi = live && product.soldOut;
+  const addDisabled = !live || soldOutUi;
+  const stockText = getProductStockText(product, live);
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
 
   const onAdd = () => {
-    if (!live || product.soldOut) return;
+    if (!live || soldOutUi) return;
 
     const result = addToCart(product, size, 1);
     if (result.status === "added") {
@@ -55,7 +56,7 @@ export default function ProductDetailClient({
 
           <div className="detail__price">GMD {product.price.toLocaleString()}</div>
           {product.isLimited ? (
-            <div className={`detail__stock ${product.soldOut ? "detail__stock--soldout" : ""}`}>
+            <div className={`detail__stock ${soldOutUi ? "detail__stock--soldout" : ""}`}>
               <span className="chip chip--limited">LIMITED ARCHIVE</span>
               <span>{stockText}</span>
             </div>
@@ -87,15 +88,15 @@ export default function ProductDetailClient({
             {!live ? <LaunchCountdown variant="inline" /> : null}
 
             <button className="btn btn--primary" onClick={onAdd} disabled={addDisabled} type="button">
-              {product.soldOut ? "SOLD OUT" : live ? "ADD TO CART" : "LOCKED — Opens April 1"}
+              {soldOutUi ? "SOLD OUT" : live ? "ADD TO CART" : "LOCKED — Opens April 1"}
             </button>
-            {live && !product.soldOut ? (
+            {live && !soldOutUi ? (
               <Link className="btn btn--ghost" href="/checkout">
                 GO TO CHECKOUT →
               </Link>
             ) : (
               <button className="btn btn--ghost" type="button" disabled>
-                {product.soldOut ? "SOLD OUT" : "LOCKED — Opens April 1"}
+                {soldOutUi ? "SOLD OUT" : "LOCKED — Opens April 1"}
               </button>
             )}
           </div>

@@ -32,7 +32,7 @@ export type ProductInventorySnapshot = {
   soldOut?: boolean;
 };
 
-const LIMITED_STOCK_QTY = 10;
+export const LIMITED_STOCK_QTY = 7;
 
 const SUPABASE_PRODUCT_IMAGE_BASE = (() => {
   const explicitBase = process.env.NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL?.trim();
@@ -143,14 +143,28 @@ export function mergeProductInventory(
 }
 
 export function getProductStockText(
-  product: Pick<Product, "isLimited" | "soldOut" | "available"> & {
+  product: Pick<Product, "isLimited" | "soldOut" | "available" | "stockQty"> & {
     availableQty?: number | null;
-  }
+  },
+  launchLive = true
 ) {
   if (!product.isLimited) return "";
+
+  const availableQty = product.availableQty ?? product.available;
+  const fallbackTotal =
+    (typeof product.stockQty === "number" && product.stockQty > 0 ? product.stockQty : null) ??
+    LIMITED_STOCK_QTY;
+
+  if (!launchLive) {
+    const totalQty =
+      typeof availableQty === "number" && availableQty > 0 ? availableQty : fallbackTotal;
+    return `LIMITED STOCK — ${totalQty} TOTAL`;
+  }
+
   if (product.soldOut) return "SOLD OUT";
-  const availableQty = product.availableQty ?? product.available ?? 0;
-  if (availableQty <= 1) return "Final piece";
+  if (availableQty === null || availableQty === undefined) return `Only ${fallbackTotal} left`;
+  if (availableQty <= 0) return "SOLD OUT";
+  if (availableQty === 1) return "Final piece";
   return `Only ${availableQty} left`;
 }
 

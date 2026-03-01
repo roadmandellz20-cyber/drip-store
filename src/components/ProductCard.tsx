@@ -38,8 +38,9 @@ export default function ProductCard({
   const cardRef = useRef<HTMLElement | null>(null);
   const warmedRef = useRef(false);
 
-  const stockText = getProductStockText(product);
-  const addDisabled = !launchLive || product.soldOut;
+  const soldOutUi = launchLive && product.soldOut;
+  const stockText = getProductStockText(product, launchLive);
+  const addDisabled = !launchLive || soldOutUi;
 
   const tilt = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -68,7 +69,7 @@ export default function ProductCard({
   return (
     <article
       ref={cardRef}
-      className={`p-card ${product.isLimited ? "p-card--limited" : "p-card--available"} ${product.soldOut ? "p-card--soldout" : ""}`}
+      className={`p-card ${product.isLimited ? "p-card--limited" : "p-card--available"} ${soldOutUi ? "p-card--soldout" : ""}`}
       style={{ transform: `rotate(${tilt}deg)` }}
       onMouseEnter={() => {
         setHover(true);
@@ -83,7 +84,7 @@ export default function ProductCard({
         </div>
 
         <Link
-          className={`p-card__imgWrap ${product.soldOut ? "p-card__imgWrap--soldout" : ""}`}
+          className={`p-card__imgWrap ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
           href={`/product/${product.id}`}
           aria-label={product.name}
           onTouchStart={warmDetailAssets}
@@ -114,11 +115,19 @@ export default function ProductCard({
           <div className="p-card__sku">{product.sku}</div>
           <h3 className="p-card__title">{product.name.toUpperCase()}</h3>
           {product.isLimited ? (
-            <div className={`p-card__scarcity ${product.soldOut ? "p-card__scarcity--soldout" : ""}`}>
-              <div className="p-card__scarcityLabel">LIMITED STOCK</div>
-              <div className={`p-card__stock ${product.soldOut ? "p-card__stock--soldout" : ""}`}>
-                {stockText}
-              </div>
+            <div className={`p-card__scarcity ${soldOutUi ? "p-card__scarcity--soldout" : ""}`}>
+              {launchLive ? (
+                <>
+                  <div className="p-card__scarcityLabel">LIMITED STOCK</div>
+                  {stockText ? (
+                    <div className={`p-card__stock ${soldOutUi ? "p-card__stock--soldout" : ""}`}>
+                      {stockText}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="p-card__stock">{stockText}</div>
+              )}
             </div>
           ) : null}
           <div className="p-card__brandline">{product.brandLine}</div>
@@ -133,7 +142,7 @@ export default function ProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {product.soldOut ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
+              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

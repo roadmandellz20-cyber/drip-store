@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isLaunchLive } from "@/lib/launch";
+import { LIMITED_STOCK_QTY } from "@/lib/products";
 import {
   adminOrderEmail,
   customerOrderEmail,
@@ -112,10 +114,14 @@ function normalizeProduct(row: Record<string, unknown>): ProductRow | null {
   const isLimited =
     typeof isLimitedRaw === "boolean" ? isLimitedRaw : status === "LIMITED";
   const stockQtyRaw = asNumber(row.stock_qty);
-  const stockQty = Number.isFinite(stockQtyRaw) ? Math.max(0, Math.floor(stockQtyRaw)) : null;
+  const stockQty = isLimited
+    ? Number.isFinite(stockQtyRaw)
+      ? Math.max(0, Math.floor(stockQtyRaw))
+      : LIMITED_STOCK_QTY
+    : null;
   const soldQtyRaw = asNumber(row.sold_qty);
   const soldQty = Number.isFinite(soldQtyRaw) ? Math.max(0, Math.floor(soldQtyRaw)) : 0;
-  const available = isLimited ? Math.max(0, (stockQty ?? 0) - soldQty) : null;
+  const available = isLimited && stockQty !== null ? Math.max(0, stockQty - soldQty) : null;
 
   return { id, slug, title, priceCents, currency, isActive, isLimited, stockQty, soldQty, available };
 }
@@ -348,6 +354,13 @@ async function sendOrderEmails(params: {
 
 export async function POST(request: Request) {
   try {
+    if (!isLaunchLive()) {
+      return NextResponse.json(
+        { error: "LOCKED — Opens April 1" },
+        { status: 403 }
+      );
+    }
+
     console.log("[orders/create] env_presence", {
       has_resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
       has_resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
