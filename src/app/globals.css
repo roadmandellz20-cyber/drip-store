@@ -1741,7 +1741,7 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 
 .launchBanner{
   position:sticky;
-  top:0;
+  top:calc(var(--promo-height) + var(--header-height));
   z-index:1200;
   display:flex;
   gap:16px;
