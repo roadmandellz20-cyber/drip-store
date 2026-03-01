@@ -11,6 +11,16 @@ npm install
 npm run dev
 ```
 
+## Build Verification
+
+Use the default production build first:
+
+```bash
+npm run build
+```
+
+In this environment, Turbopack build verification may require unsandboxed execution. Inside restricted sandboxes, the build can appear to hang or fail while processing `src/app/globals.css` because the PostCSS worker tries to bind a local port. If that happens, rerun `npm run build` outside the sandbox. `npm run build -- --webpack` is a useful fallback sanity check, but Vercel production uses the default build path.
+
 ## Required Environment Variables
 
 ```bash
