@@ -6,6 +6,7 @@ import FxLayer from "@/components/FxLayer";
 import BackHomeArrow from "@/components/BackHomeArrow";
 import { absoluteUrl, getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE } from "@/lib/site";
 import ToastClient from "./toast.client";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
@@ -67,6 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Footer />
         <div id="toast" aria-live="polite" aria-atomic="true" />
         <ToastClient />
+        <Analytics />
       </body>
     </html>
   );
