@@ -4,6 +4,7 @@
 
 export type EmailOrderItem = {
   title: string;
+  sku?: string;
   qty: number;
   unitPriceCents: number;
   lineTotalCents: number;
@@ -36,6 +37,9 @@ type EmailTemplate = {
   text: string;
 };
 
+const WHATSAPP_SUPPORT_URL = "https://wa.me/2203340558";
+const INSTAGRAM_URL = "https://instagram.com/mugendistrict";
+
 function esc(input: unknown) {
   const s = typeof input === "string" ? input : String(input ?? "");
   return s
@@ -67,10 +71,12 @@ function orderItemsText(items: EmailOrderItem[]) {
   return items
     .map((it) => {
       const size = (it.size || "M").toUpperCase();
+      const sku = (it.sku || "").trim();
       const limitedNote = it.limited
         ? `\n  Limited Archive piece confirmed${typeof it.remainingQty === "number" ? ` — ${it.remainingQty} left` : ""}`
         : "";
-      return `- ${it.title} (Size ${size}) x${it.qty} — ${formatMoney(
+      const skuText = sku ? ` [${sku}]` : "";
+      return `- ${it.title}${skuText} (Size ${size}) x${it.qty} — ${formatMoney(
         it.lineTotalCents,
         it.currency
       )}${limitedNote}`;
@@ -190,12 +196,13 @@ function renderOrderTable(params: {
   const rows = items
     .map((it) => {
       const size = (it.size || "M").toUpperCase();
+      const sku = (it.sku || "").trim();
       return `
         <tr>
           <td style="padding:14px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;">
             <div style="font-weight:800;font-size:14px;line-height:1.25;">${esc(it.title)}</div>
             <div style="margin-top:6px;font-size:12px;line-height:1.4;color:rgba(255,255,255,0.72);">
-              Size: ${esc(size)} • Qty: ${esc(it.qty)}
+              ${sku ? `SKU: ${esc(sku)} • ` : ""}Size: ${esc(size)} • Qty: ${esc(it.qty)}
             </div>
             ${
               it.limited
@@ -263,12 +270,12 @@ function renderCustomerBody(payload: OrderEmailPayload) {
   const statusPanel = `
     <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
       <div style="font-weight:800;font-size:14px;letter-spacing:0.02em;">
-        ENTER THE MUGEN.
+        ORDER CONFIRMED.
       </div>
       <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        Your order has been archived successfully.<br/>
+        Your archive pull is locked.<br/>
         ${hasLimitedPiece ? "Limited Archive piece confirmed.<br/>" : ""}
-        You will be contacted shortly to complete payment and delivery.
+        We will message you next with payment and delivery details.
       </div>
     </div>
   `;
@@ -311,7 +318,29 @@ function renderCustomerBody(payload: OrderEmailPayload) {
 
   const trustLine = `
     <div style="margin-top:18px;font-size:12px;line-height:1.6;color:rgba(255,255,255,0.72);">
-      This is a manual-payment order. Keep this email for your records.
+      This is a manual-payment order. Keep this email for your records and use the fast lane below if you want immediate support.
+    </div>
+  `;
+
+  const nextSteps = `
+    <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Next Steps</div>
+      <div style="margin-top:8px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
+        1. We review the order and confirm payment options.<br/>
+        2. We message you with delivery timing.<br/>
+        3. For a faster line, hit WhatsApp or keep up with the archive on Instagram.
+      </div>
+    </div>
+  `;
+
+  const linksBlock = `
+    <div style="margin-top:18px;">
+      <a href="${WHATSAPP_SUPPORT_URL}" style="display:inline-block;padding:12px 16px;border:1px solid rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;">
+        WhatsApp Support
+      </a>
+      <a href="${INSTAGRAM_URL}" style="display:inline-block;margin-left:10px;padding:12px 16px;border:1px solid rgba(255,255,255,0.12);color:#ffffff;text-decoration:none;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
+        Instagram
+      </a>
     </div>
   `;
 
@@ -321,6 +350,8 @@ function renderCustomerBody(payload: OrderEmailPayload) {
     ${table}
     ${shippingBlock}
     ${noteBlock}
+    ${nextSteps}
+    ${linksBlock}
     ${trustLine}
   `;
 }
@@ -338,6 +369,10 @@ function renderCustomerFooter() {
     <div style="margin-top:14px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
       <span style="color:rgba(255,255,255,0.72);">Support:</span>
       <span style="font-weight:800;"> reply to this email</span>
+    </div>
+    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
+      WhatsApp: <a href="${WHATSAPP_SUPPORT_URL}" style="color:#ffffff;">${WHATSAPP_SUPPORT_URL}</a><br/>
+      Instagram: <a href="${INSTAGRAM_URL}" style="color:#ffffff;">${INSTAGRAM_URL}</a>
     </div>
   `;
 }
@@ -424,13 +459,13 @@ function renderAdminFooter() {
 }
 
 export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `Your Order Is Locked In — ${payload.orderNumber}`;
-  const preheader = `Order archived: ${payload.orderNumber}. You will be contacted shortly to complete payment and delivery.`;
+  const subject = `Order Confirmed — ${payload.orderNumber} | MUGEN DISTRICT`;
+  const preheader = `Order confirmed: ${payload.orderNumber}. Next steps, support, and archive links inside.`;
 
   const html = wrapHtml({
     preheader,
-    headlineTop: "ENTER THE MUGEN.",
-    headlineBottom: "ORDER ARCHIVED.",
+    headlineTop: "ORDER CONFIRMED.",
+    headlineBottom: "TOKYO GRIT LOGGED.",
     bodyHtml: renderCustomerBody(payload),
     footerHtml: renderCustomerFooter(),
   });
@@ -438,11 +473,11 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
   const text = [
     "MUGEN DISTRICT",
     "",
-    "ENTER THE MUGEN.",
-    "Your order has been archived successfully.",
-    "You will be contacted shortly to complete payment and delivery.",
+    "ORDER CONFIRMED.",
+    "Tokyo grit. Archive locked.",
+    "We will message you next with payment and delivery details.",
     "",
-    `Order: ${payload.orderNumber}`,
+    `Order Ref: ${payload.orderNumber}`,
     "",
     "Items:",
     orderItemsText(payload.items),
@@ -454,6 +489,12 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     `${joinAddressOneLine(payload.shippingAddress) || "—"}`,
     payload.customerPhone ? `Phone: ${payload.customerPhone}` : "",
     payload.deliveryNote ? `Note: ${payload.deliveryNote}` : "",
+    "",
+    "Next Steps:",
+    "1. Watch for payment instructions.",
+    "2. Watch for delivery timing.",
+    `3. WhatsApp support: ${WHATSAPP_SUPPORT_URL}`,
+    `4. Instagram: ${INSTAGRAM_URL}`,
     "",
     "THE ARCHIVE",
     "Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics.",

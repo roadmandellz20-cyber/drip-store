@@ -1,5 +1,8 @@
 import "server-only";
 
+import { customerOrderEmail, type OrderEmailPayload } from "./templates.ts";
+import { resolveResendFromAddress, VERIFIED_FROM } from "./resend-config.ts";
+
 type SendArgs = {
   to: string;
   subject: string;
@@ -7,6 +10,7 @@ type SendArgs = {
   text?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  from?: string;
 };
 
 export type SendEmailResult = {
@@ -39,7 +43,7 @@ export class ResendRequestError extends Error {
   }
 }
 
-const VERIFIED_FROM = "Mugen District <orders@mugendistrict.com>";
+const DEFAULT_REPLY_TO = "support@mugendistrict.com";
 
 function isEmailDebugEnabled() {
   const value = (process.env.EMAIL_DEBUG || "").trim().toLowerCase();
@@ -49,15 +53,23 @@ function isEmailDebugEnabled() {
 function getResendConfig() {
   const apiKey = (process.env.RESEND_API_KEY || "").trim();
   const fromEmail = (process.env.RESEND_FROM_EMAIL || "").trim();
+  const customerFromEmail = (process.env.RESEND_CUSTOMER_FROM_EMAIL || "").trim();
   const fromName = (process.env.RESEND_FROM_NAME || "").trim() || "Mugen District";
-  const from =
-    fromEmail && fromName ? `${fromName} <${fromEmail}>` : fromEmail || VERIFIED_FROM;
+  const from = resolveResendFromAddress({
+    rawFrom: fromEmail,
+    fallbackFrom: VERIFIED_FROM,
+    fromName,
+  });
+  const customerFrom = resolveResendFromAddress({
+    rawFrom: customerFromEmail,
+    fallbackFrom: from,
+    fromName,
+  });
   const replyTo =
     (process.env.RESEND_REPLY_TO || "").trim() ||
-    (process.env.ADMIN_ORDER_EMAIL || "").trim() ||
-    "";
+    DEFAULT_REPLY_TO;
 
-  return { apiKey, from, replyTo };
+  return { apiKey, from, customerFrom, replyTo };
 }
 
 function messageFromResendBody(body: unknown, status: number) {
@@ -145,28 +157,30 @@ export async function sendEmail({
   text,
   replyTo,
   headers,
+  from,
 }: SendArgs): Promise<SendEmailResult> {
-  const { apiKey, from, replyTo: defaultReplyTo } = getResendConfig();
+  const { apiKey, from: defaultFrom, replyTo: defaultReplyTo } = getResendConfig();
   if (!apiKey) {
     throw new Error("Missing RESEND_API_KEY.");
   }
+  const sender = from || defaultFrom;
 
   const debug = isEmailDebugEnabled();
   if (debug) {
-    console.log("[EMAIL_DEBUG] request", { from, to, subject });
+    console.log("[EMAIL_DEBUG] request", { from: sender, to, subject });
   }
 
   const primary = await sendViaResend({
     apiKey,
-    from,
-      to,
-      subject,
-      html,
-      text,
-      replyTo: replyTo || defaultReplyTo || undefined,
-      headers,
-      debug,
-    });
+    from: sender,
+    to,
+    subject,
+    html,
+    text,
+    replyTo: replyTo || defaultReplyTo || undefined,
+    headers,
+    debug,
+  });
 
   if (primary.ok) {
     return { status: primary.status, id: primary.id };
@@ -176,7 +190,7 @@ export async function sendEmail({
     status: primary.status,
     body: primary.body,
     to,
-    from,
+    from: sender,
     subject,
   });
 
@@ -185,7 +199,24 @@ export async function sendEmail({
     status: primary.status,
     body: primary.body,
     to,
-    from,
+    from: sender,
     subject,
+  });
+}
+
+export async function sendCustomerOrderConfirmation(args: {
+  to: string;
+  payload: OrderEmailPayload;
+}) {
+  const { customerFrom, replyTo } = getResendConfig();
+  const template = customerOrderEmail(args.payload);
+
+  return sendEmail({
+    to: args.to,
+    from: customerFrom,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    replyTo,
   });
 }

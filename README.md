@@ -31,6 +31,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
+RESEND_CUSTOMER_FROM_EMAIL=
+RESEND_REPLY_TO=support@mugendistrict.com
 RESEND_FROM_NAME=Mugen District
 ADMIN_ORDER_EMAIL=
 EMAIL_DEBUG=false
@@ -42,6 +44,8 @@ EMAIL_DEBUG=false
 
 - Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
 - Required sender: `Mugen District <orders@mugendistrict.com>`.
+- `RESEND_CUSTOMER_FROM_EMAIL` is optional and falls back to `RESEND_FROM_EMAIL`.
+- `RESEND_REPLY_TO` can point to `support@mugendistrict.com` or your preferred support inbox.
 - Do not use `onboarding@resend.dev` in production.
 - Customer emails are attempted whenever the checkout or signup includes a recipient email.
 - Admin order emails are always attempted to `ADMIN_ORDER_EMAIL`.
@@ -95,6 +99,7 @@ Run SQL files in `supabase/migrations/` in order, then run `migrate_orders.sql` 
 - `20260301_waitlist.sql`
 - `20260301_waitlist_public_insert_policy.sql`
 - `20260302_align_catalog_prices.sql`
+- `20260302_customer_order_email_state.sql`
 
 Manual SQL Editor scripts:
 

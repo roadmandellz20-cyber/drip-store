@@ -34,6 +34,15 @@ alter table if exists public.orders
   add column if not exists email_error text;
 
 alter table if exists public.orders
+  add column if not exists customer_email_status text;
+
+alter table if exists public.orders
+  add column if not exists customer_email_error text;
+
+alter table if exists public.orders
+  add column if not exists customer_email_sent_at timestamptz;
+
+alter table if exists public.orders
   add column if not exists created_at timestamptz default now();
 
 alter table if exists public.orders
@@ -90,6 +99,21 @@ create unique index if not exists orders_order_number_unique
 create unique index if not exists orders_idempotency_key_unique
   on public.orders(idempotency_key)
   where idempotency_key is not null;
+
+update public.orders
+set
+  customer_email_status = 'sent',
+  customer_email_error = null,
+  customer_email_sent_at = coalesce(customer_email_sent_at, created_at)
+where coalesce(btrim(customer_email_status), '') = ''
+  and lower(coalesce(email_status, '')) = 'sent';
+
+update public.orders
+set
+  customer_email_status = 'failed',
+  customer_email_error = coalesce(customer_email_error, email_error)
+where coalesce(btrim(customer_email_status), '') = ''
+  and lower(coalesce(email_status, '')) = 'failed';
 
 create table if not exists public.order_items (
   id uuid primary key default gen_random_uuid(),

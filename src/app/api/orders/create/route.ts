@@ -4,10 +4,21 @@ import { isLaunchLive } from "@/lib/launch";
 import { LIMITED_STOCK_QTY } from "@/lib/products";
 import {
   adminOrderEmail,
-  customerOrderEmail,
   type EmailOrderItem,
+  type OrderEmailPayload,
 } from "@/lib/email/templates";
-import { ResendRequestError, sendEmail } from "@/lib/email/send";
+import {
+  ResendRequestError,
+  sendCustomerOrderConfirmation,
+  sendEmail,
+} from "@/lib/email/send";
+import {
+  deriveAggregateEmailStatus,
+  isBasicCustomerEmail,
+  normalizeDeliveryStatus,
+  shouldSendCustomerConfirmation,
+  type DeliveryStatus,
+} from "@/lib/orders/email-state";
 
 export const runtime = "nodejs";
 
@@ -59,6 +70,40 @@ type ValidatedLine = {
   remainingQty: number | null;
 };
 
+type ExistingOrderRow = {
+  id: string;
+  emailStatus: string;
+  emailError: string;
+  customerEmail: string;
+  customerEmailStatus: string;
+  customerEmailError: string;
+  customerEmailSentAt: string;
+};
+
+type OrderEmailContext = {
+  orderId: string;
+  orderRef: string;
+  payload: OrderEmailPayload;
+  customerEmailStatus: string;
+  customerEmailError: string;
+  customerEmailSentAt: string;
+  emailStatus: string;
+  emailError: string;
+};
+
+type CustomerEmailResult = {
+  status: DeliveryStatus;
+  error: string | null;
+  sentAt: string | null;
+};
+
+type OrderEmailResult = {
+  customer: CustomerEmailResult;
+  adminStatus: DeliveryStatus;
+  adminError: string | null;
+  errors: string[];
+};
+
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -69,6 +114,14 @@ function asNumber(value: unknown) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isMissingCustomerEmailStateColumnError(message: string) {
+  return /customer_email_(status|error|sent_at)/i.test(message);
 }
 
 function buildLaunchEnvPresence() {
@@ -86,6 +139,7 @@ function buildLaunchEnvPresence() {
     force_launch_live_until: Boolean(asString(process.env.FORCE_LAUNCH_LIVE_UNTIL)),
     resend_api_key: Boolean(asString(process.env.RESEND_API_KEY)),
     resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
+    resend_customer_from_email: Boolean(asString(process.env.RESEND_CUSTOMER_FROM_EMAIL)),
     admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
     inventory_tracking_enabled: Boolean(asString(process.env.INVENTORY_TRACKING_ENABLED)),
   };
@@ -223,38 +277,79 @@ function parseOutOfStockMessage(message: string) {
 }
 
 async function findExistingOrderByIdempotencyKey(idempotencyKey: string) {
-  const query = await supabaseAdmin
+  const primary = await supabaseAdmin
     .from("orders")
-    .select("id,email_status,email_error")
+    .select(
+      "id,customer_email,email_status,email_error,customer_email_status,customer_email_error,customer_email_sent_at"
+    )
     .eq("idempotency_key", idempotencyKey)
     .maybeSingle();
+
+  const query =
+    primary.error && isMissingCustomerEmailStateColumnError(primary.error.message)
+      ? await supabaseAdmin
+          .from("orders")
+          .select("id,customer_email,email_status,email_error")
+          .eq("idempotency_key", idempotencyKey)
+          .maybeSingle()
+      : primary;
 
   if (query.error) {
     throw new Error(query.error.message);
   }
 
-  return query.data;
+  if (!query.data || !isRecord(query.data)) {
+    return null;
+  }
+  const row = query.data as Record<string, unknown>;
+  const emailStatus = asString(row.email_status);
+  const customerEmailStatus =
+    asString(row.customer_email_status) ||
+    (emailStatus.toLowerCase() === "sent" ? "sent" : "");
+
+  return {
+    id: asString(row.id),
+    emailStatus,
+    emailError: asString(row.email_error),
+    customerEmail: asString(row.customer_email),
+    customerEmailStatus,
+    customerEmailError: asString(row.customer_email_error),
+    customerEmailSentAt: asString(row.customer_email_sent_at),
+  } satisfies ExistingOrderRow;
 }
 
-async function sendOrderEmails(params: {
-  orderNumber: string;
-  shipping: IncomingShipping;
-  shippingAddress: string;
-  currency: string;
-  totalCents: number;
-  lines: ValidatedLine[];
+function buildOrderResponse(args: {
+  orderId: string;
+  reused?: boolean;
+  emailStatus?: string | null;
+  emailError?: string | null;
+  emailAdminSent?: boolean | null;
+  emailCustomerSent?: boolean | null;
+  customerEmailStatus?: string | null;
+  customerEmailError?: string | null;
+  customerEmailSentAt?: string | null;
+  warning?: string | null;
 }) {
-  const result = {
-    customer: "skipped" as "sent" | "failed" | "skipped",
-    admin: "skipped" as "sent" | "failed" | "skipped",
-    errors: [] as string[],
+  return {
+    ok: true,
+    reused: Boolean(args.reused),
+    order_id: args.orderId,
+    order_ref: makeOrderRef(args.orderId),
+    email_status: args.emailStatus || null,
+    email_admin_sent: args.emailAdminSent ?? null,
+    email_customer_sent: args.emailCustomerSent ?? null,
+    email_error: args.emailError || null,
+    customer_email_status: args.customerEmailStatus || null,
+    customer_email_error: args.customerEmailError || null,
+    customer_email_sent_at: args.customerEmailSentAt || null,
+    warning: args.warning || null,
   };
+}
 
-  const customerEmail = asString(params.shipping.email);
-  const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
-
-  const emailItems: EmailOrderItem[] = params.lines.map((line) => ({
+function buildEmailItemsFromLines(lines: ValidatedLine[]): EmailOrderItem[] {
+  return lines.map((line) => ({
     title: line.title,
+    sku: line.productSlug,
     qty: line.qty,
     unitPriceCents: line.unitPriceCents,
     lineTotalCents: line.lineTotalCents,
@@ -263,57 +358,288 @@ async function sendOrderEmails(params: {
     limited: line.isLimited,
     remainingQty: line.remainingQty,
   }));
+}
 
-  const payload = {
-    orderNumber: params.orderNumber,
-    currency: params.currency,
-    totalCents: params.totalCents,
-    customerName: asString(params.shipping.name),
-    customerEmail,
-    customerPhone: asString(params.shipping.phone),
-    shippingAddress: params.shippingAddress,
-    deliveryNote: asString(params.shipping.deliveryNote),
-    items: emailItems,
+function buildOrderEmailPayload(args: {
+  orderRef: string;
+  shipping: IncomingShipping;
+  shippingAddress: string;
+  currency: string;
+  totalCents: number;
+  items: EmailOrderItem[];
+}): OrderEmailPayload {
+  return {
+    orderNumber: args.orderRef,
+    currency: args.currency,
+    totalCents: args.totalCents,
+    customerName: asString(args.shipping.name),
+    customerEmail: asString(args.shipping.email),
+    customerPhone: asString(args.shipping.phone),
+    shippingAddress: args.shippingAddress,
+    deliveryNote: asString(args.shipping.deliveryNote),
+    items: args.items,
+  };
+}
+
+async function loadOrderEmailContext(orderId: string): Promise<OrderEmailContext> {
+  const [primaryOrderQuery, itemsQuery] = await Promise.all([
+    supabaseAdmin
+      .from("orders")
+      .select(
+        "id,customer_name,customer_email,customer_phone,customer_address,delivery_note,total_cents,currency,email_status,email_error,customer_email_status,customer_email_error,customer_email_sent_at"
+      )
+      .eq("id", orderId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("order_items")
+      .select("product_slug,title,qty,size,unit_price_cents,price_cents,line_total_cents,currency")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  const orderQuery =
+    primaryOrderQuery.error && isMissingCustomerEmailStateColumnError(primaryOrderQuery.error.message)
+      ? await supabaseAdmin
+          .from("orders")
+          .select(
+            "id,customer_name,customer_email,customer_phone,customer_address,delivery_note,total_cents,currency,email_status,email_error"
+          )
+          .eq("id", orderId)
+          .maybeSingle()
+      : primaryOrderQuery;
+
+  if (orderQuery.error) {
+    throw new Error(orderQuery.error.message);
+  }
+  if (!orderQuery.data || !isRecord(orderQuery.data)) {
+    throw new Error("Order email context not found.");
+  }
+  if (itemsQuery.error) {
+    throw new Error(itemsQuery.error.message);
+  }
+  const orderRow = orderQuery.data as Record<string, unknown>;
+
+  const orderCurrency = (asString(orderRow.currency) || "GMD").toUpperCase();
+  const items = ((itemsQuery.data as Array<Record<string, unknown>> | null) || [])
+    .map((row): EmailOrderItem | null => {
+      const title = asString(row.title);
+      const qty = Math.max(1, Math.floor(asNumber(row.qty)));
+      const unitPriceCents = Math.round(asNumber(row.unit_price_cents) || asNumber(row.price_cents));
+      const lineTotalCents = Math.round(asNumber(row.line_total_cents) || unitPriceCents * qty);
+
+      if (!title || !Number.isFinite(unitPriceCents) || unitPriceCents <= 0) {
+        return null;
+      }
+
+      return {
+        title,
+        sku: asString(row.product_slug),
+        qty,
+        unitPriceCents,
+        lineTotalCents,
+        currency: (asString(row.currency) || orderCurrency).toUpperCase(),
+        size: normalizeSize(row.size),
+      } satisfies EmailOrderItem;
+    })
+    .filter((item): item is EmailOrderItem => item !== null);
+
+  const shipping: IncomingShipping = {
+    name: asString(orderRow.customer_name),
+    email: asString(orderRow.customer_email),
+    phone: asString(orderRow.customer_phone),
+    deliveryNote: asString(orderRow.delivery_note),
+  };
+  const shippingAddress = asString(orderRow.customer_address);
+  const emailStatus = asString(orderRow.email_status);
+  const customerEmailStatus =
+    asString(orderRow.customer_email_status) ||
+    (emailStatus.toLowerCase() === "sent" ? "sent" : "");
+
+  return {
+    orderId,
+    orderRef: makeOrderRef(orderId),
+    payload: buildOrderEmailPayload({
+      orderRef: makeOrderRef(orderId),
+      shipping,
+      shippingAddress,
+      currency: orderCurrency,
+      totalCents: Math.round(asNumber(orderRow.total_cents)),
+      items,
+    }),
+    emailStatus,
+    emailError: asString(orderRow.email_error),
+    customerEmailStatus,
+    customerEmailError: asString(orderRow.customer_email_error),
+    customerEmailSentAt: asString(orderRow.customer_email_sent_at),
+  };
+}
+
+async function persistCustomerEmailState(orderId: string, result: CustomerEmailResult) {
+  const query = await supabaseAdmin
+    .from("orders")
+    .update({
+      customer_email_status: result.status,
+      customer_email_error: result.error,
+      customer_email_sent_at: result.sentAt,
+    })
+    .eq("id", orderId);
+
+  if (query.error) {
+    if (isMissingCustomerEmailStateColumnError(query.error.message)) {
+      console.error(
+        "[orders/create] customer email metadata update skipped: missing customer email columns. Run 20260302_customer_order_email_state.sql."
+      );
+      return;
+    }
+    console.error(`[orders/create] customer email metadata update skipped: ${query.error.message}`);
+  }
+}
+
+async function sendCustomerConfirmationForOrder(args: {
+  orderId: string;
+  payload: OrderEmailPayload;
+  existingStatus?: string;
+  existingError?: string;
+  existingSentAt?: string;
+}) {
+  const customerEmail = asString(args.payload.customerEmail);
+
+  if (!isBasicCustomerEmail(customerEmail)) {
+    const result: CustomerEmailResult = {
+      status: "skipped",
+      error: customerEmail ? "Invalid customer email address." : null,
+      sentAt: null,
+    };
+    await persistCustomerEmailState(args.orderId, result);
+    if (result.error) {
+      console.warn("[orders/create] customer email skipped: invalid email", {
+        order_id: args.orderId,
+        customer_email: customerEmail,
+      });
+    }
+    return result;
+  }
+
+  if (
+    !shouldSendCustomerConfirmation({
+      customerEmail,
+      customerEmailStatus: args.existingStatus,
+      customerEmailSentAt: args.existingSentAt,
+    })
+  ) {
+    return {
+      status: "sent",
+      error: args.existingError || null,
+      sentAt: args.existingSentAt || null,
+    } satisfies CustomerEmailResult;
+  }
+
+  try {
+    const customerResult = await sendCustomerOrderConfirmation({
+      to: customerEmail,
+      payload: args.payload,
+    });
+    const result: CustomerEmailResult = {
+      status: "sent",
+      error: null,
+      sentAt: new Date().toISOString(),
+    };
+    await persistCustomerEmailState(args.orderId, result);
+    console.log(
+      `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"} to=${customerEmail}`
+    );
+    return result;
+  } catch (error) {
+    const message = errorMessage(error);
+    const result: CustomerEmailResult = {
+      status: "failed",
+      error: message,
+      sentAt: null,
+    };
+    await persistCustomerEmailState(args.orderId, result);
+    console.error(`[orders/create] resend customer error=${message}`);
+    if (error instanceof ResendRequestError) {
+      console.error("[orders/create] resend customer failure payload", {
+        status: error.status,
+        body: error.body,
+        from: error.from,
+        to: error.to,
+        subject: error.subject,
+      });
+    }
+    return result;
+  }
+}
+
+async function ensureCustomerConfirmationForExistingOrder(orderId: string) {
+  const context = await loadOrderEmailContext(orderId);
+  const wasAlreadySent =
+    normalizeDeliveryStatus(context.customerEmailStatus) === "sent" ||
+    Boolean(context.customerEmailSentAt);
+  const customer = await sendCustomerConfirmationForOrder({
+    orderId,
+    payload: context.payload,
+    existingStatus: context.customerEmailStatus,
+    existingError: context.customerEmailError,
+    existingSentAt: context.customerEmailSentAt,
+  });
+
+  return {
+    context,
+    customer,
+    customerSentNow: customer.status === "sent" && !wasAlreadySent,
+  };
+}
+
+async function sendOrderEmails(params: {
+  orderId: string;
+  orderNumber: string;
+  shipping: IncomingShipping;
+  shippingAddress: string;
+  currency: string;
+  totalCents: number;
+  lines: ValidatedLine[];
+}) {
+  const result: OrderEmailResult = {
+    customer: {
+      status: "skipped",
+      error: null,
+      sentAt: null,
+    },
+    adminStatus: "skipped",
+    adminError: null,
+    errors: [] as string[],
   };
 
+  const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
+  const emailItems = buildEmailItemsFromLines(params.lines);
+  const payload = buildOrderEmailPayload({
+    orderRef: params.orderNumber,
+    shipping: params.shipping,
+    shippingAddress: params.shippingAddress,
+    currency: params.currency,
+    totalCents: params.totalCents,
+    items: emailItems,
+  });
+
   console.log("[orders/create] email_policy", {
-    has_customer_email: Boolean(customerEmail),
+    has_customer_email: Boolean(asString(params.shipping.email)),
     has_admin_order_email: Boolean(adminEmail),
   });
 
-  if (customerEmail) {
-    try {
-      const customerTemplate = customerOrderEmail(payload);
-      const customerResult = await sendEmail({
-        to: customerEmail,
-        subject: customerTemplate.subject,
-        html: customerTemplate.html,
-        text: customerTemplate.text,
-      });
-      result.customer = "sent";
-      console.log(
-        `[orders/create] resend customer status=${customerResult.status} id=${customerResult.id || "n/a"} to=${customerEmail}`
-      );
-    } catch (error) {
-      result.customer = "failed";
-      const message = errorMessage(error);
-      result.errors.push(`customer: ${message}`);
-      console.error(`[orders/create] resend customer error=${message}`);
-      if (error instanceof ResendRequestError) {
-        console.error("[orders/create] resend customer failure payload", {
-          status: error.status,
-          body: error.body,
-          from: error.from,
-          to: error.to,
-          subject: error.subject,
-        });
-      }
-    }
+  result.customer = await sendCustomerConfirmationForOrder({
+    orderId: params.orderId,
+    payload,
+  });
+  if (result.customer.error) {
+    result.errors.push(`customer: ${result.customer.error}`);
   }
 
   if (!adminEmail) {
     const message = "ADMIN_ORDER_EMAIL is empty; skipping admin order email.";
-    result.errors.push(message);
+    result.adminStatus = "failed";
+    result.adminError = message;
+    result.errors.push(`admin: ${message}`);
     console.error(`[orders/create] ${message}`);
     return result;
   }
@@ -326,13 +652,14 @@ async function sendOrderEmails(params: {
       html: adminTemplate.html,
       text: adminTemplate.text,
     });
-    result.admin = "sent";
+    result.adminStatus = "sent";
     console.log(
       `[orders/create] resend admin status=${adminResult.status} id=${adminResult.id || "n/a"} to=${adminEmail}`
     );
   } catch (error) {
-    result.admin = "failed";
+    result.adminStatus = "failed";
     const message = errorMessage(error);
+    result.adminError = message;
     result.errors.push(`admin: ${message}`);
     console.error(`[orders/create] resend admin error=${message}`);
     if (error instanceof ResendRequestError) {
@@ -398,18 +725,22 @@ export async function POST(request: Request) {
     if (idempotencyKey) {
       const existingOrder = await findExistingOrderByIdempotencyKey(idempotencyKey);
       if (existingOrder?.id) {
-        const existingId = asString(existingOrder.id);
+        const replay = await ensureCustomerConfirmationForExistingOrder(existingOrder.id);
 
-        return NextResponse.json({
-          ok: true,
-          reused: true,
-          order_id: existingId,
-          order_ref: makeOrderRef(existingId),
-          email_status: asString(existingOrder.email_status) || null,
-          email_admin_sent: null,
-          email_customer_sent: null,
-          email_error: asString(existingOrder.email_error) || null,
-        });
+        return NextResponse.json(
+          buildOrderResponse({
+            orderId: existingOrder.id,
+            reused: true,
+            emailStatus: replay.context.emailStatus || existingOrder.emailStatus || null,
+            emailError: replay.context.emailError || existingOrder.emailError || null,
+            emailAdminSent: null,
+            emailCustomerSent:
+              replay.customer.status === "sent" ? true : replay.customer.status === "failed" ? false : null,
+            customerEmailStatus: replay.customer.status,
+            customerEmailError: replay.customer.error,
+            customerEmailSentAt: replay.customer.sentAt,
+          })
+        );
       }
     }
 
@@ -518,17 +849,25 @@ export async function POST(request: Request) {
       if (isIdempotencyConflict && idempotencyKey) {
         const duplicate = await findExistingOrderByIdempotencyKey(idempotencyKey);
         if (duplicate?.id) {
-          const duplicateId = asString(duplicate.id);
-          return NextResponse.json({
-            ok: true,
-            reused: true,
-            order_id: duplicateId,
-            order_ref: makeOrderRef(duplicateId),
-            email_status: asString(duplicate.email_status) || null,
-            email_admin_sent: null,
-            email_customer_sent: null,
-            email_error: asString(duplicate.email_error) || null,
-          });
+          const replay = await ensureCustomerConfirmationForExistingOrder(duplicate.id);
+          return NextResponse.json(
+            buildOrderResponse({
+              orderId: duplicate.id,
+              reused: true,
+              emailStatus: replay.context.emailStatus || duplicate.emailStatus || null,
+              emailError: replay.context.emailError || duplicate.emailError || null,
+              emailAdminSent: null,
+              emailCustomerSent:
+                replay.customer.status === "sent"
+                  ? true
+                  : replay.customer.status === "failed"
+                    ? false
+                    : null,
+              customerEmailStatus: replay.customer.status,
+              customerEmailError: replay.customer.error,
+              customerEmailSentAt: replay.customer.sentAt,
+            })
+          );
         }
       }
 
@@ -545,17 +884,21 @@ export async function POST(request: Request) {
     const orderRef = makeOrderRef(orderId);
 
     if (reusedOrder && idempotencyKey) {
-      const existingOrder = await findExistingOrderByIdempotencyKey(idempotencyKey);
-      return NextResponse.json({
-        ok: true,
-        reused: true,
-        order_id: orderId,
-        order_ref: orderRef,
-        email_status: asString(existingOrder?.email_status) || null,
-        email_admin_sent: null,
-        email_customer_sent: null,
-        email_error: asString(existingOrder?.email_error) || null,
-      });
+      const replay = await ensureCustomerConfirmationForExistingOrder(orderId);
+      return NextResponse.json(
+        buildOrderResponse({
+          orderId,
+          reused: true,
+          emailStatus: replay.context.emailStatus || null,
+          emailError: replay.context.emailError || null,
+          emailAdminSent: null,
+          emailCustomerSent:
+            replay.customer.status === "sent" ? true : replay.customer.status === "failed" ? false : null,
+          customerEmailStatus: replay.customer.status,
+          customerEmailError: replay.customer.error,
+          customerEmailSentAt: replay.customer.sentAt,
+        })
+      );
     }
 
     console.log(`[orders/create] inserted order id=${orderId} order_ref=${orderRef}`);
@@ -576,17 +919,24 @@ export async function POST(request: Request) {
     console.log("[orders/create] email_env_presence", {
       resend_api_key: !!process.env.RESEND_API_KEY,
       resend_from_email: !!process.env.RESEND_FROM_EMAIL,
+      resend_customer_from_email: !!process.env.RESEND_CUSTOMER_FROM_EMAIL,
       admin_order_email: !!process.env.ADMIN_ORDER_EMAIL,
     });
 
     let emailResult: Awaited<ReturnType<typeof sendOrderEmails>> = {
-      customer: "skipped",
-      admin: "skipped",
+      customer: {
+        status: "skipped",
+        error: null,
+        sentAt: null,
+      },
+      adminStatus: "skipped",
+      adminError: null,
       errors: [],
     };
 
     try {
       emailResult = await sendOrderEmails({
+        orderId,
         orderNumber: orderRef,
         shipping,
         shippingAddress,
@@ -597,28 +947,37 @@ export async function POST(request: Request) {
     } catch (error) {
       const message = errorMessage(error);
       emailResult = {
-        customer: "failed",
-        admin: "failed",
+        customer: {
+          status: "failed",
+          error: message,
+          sentAt: null,
+        },
+        adminStatus: "failed",
+        adminError: message,
         errors: [`unexpected_email_error: ${message}`],
       };
       console.error(`[orders/create] unexpected email pipeline error=${message}`);
     }
 
-    const emailAdminSent = emailResult.admin === "sent";
-    const emailCustomerSent = emailResult.customer === "sent";
-    const derivedEmailStatus =
-      emailResult.errors.length === 0
-        ? "sent"
-        : emailCustomerSent || emailAdminSent
-          ? "partial"
-          : "failed";
+    const emailAdminSent = emailResult.adminStatus === "sent";
+    const emailCustomerSent = emailResult.customer.status === "sent";
+    let derivedEmailStatus = deriveAggregateEmailStatus({
+      adminStatus: emailResult.adminStatus,
+      customerStatus: emailResult.customer.status,
+    });
+    if (emailResult.errors.length > 0 && derivedEmailStatus === "sent") {
+      derivedEmailStatus = "partial";
+    }
+    if (emailResult.errors.length > 0 && derivedEmailStatus === "skipped") {
+      derivedEmailStatus = "failed";
+    }
     const emailError = emailResult.errors.length ? emailResult.errors.join(" | ") : null;
     const warning = emailError
       ? "Order was created but one or more emails failed to send."
       : null;
 
     console.log(
-      `[orders/create] email_status=${derivedEmailStatus} customer=${emailResult.customer} admin=${emailResult.admin}`
+      `[orders/create] email_status=${derivedEmailStatus} customer=${emailResult.customer.status} admin=${emailResult.adminStatus}`
     );
 
     // Optional metadata update; failures here must not block the response.
@@ -636,16 +995,19 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      order_id: orderId,
-      order_ref: orderRef,
-      email_status: derivedEmailStatus,
-      email_admin_sent: emailAdminSent,
-      email_customer_sent: emailCustomerSent,
-      email_error: emailError,
-      warning,
-    });
+    return NextResponse.json(
+      buildOrderResponse({
+        orderId,
+        emailStatus: derivedEmailStatus,
+        emailError,
+        emailAdminSent,
+        emailCustomerSent,
+        customerEmailStatus: emailResult.customer.status,
+        customerEmailError: emailResult.customer.error,
+        customerEmailSentAt: emailResult.customer.sentAt,
+        warning,
+      })
+    );
   } catch (error) {
     return NextResponse.json(
       { error: errorMessage(error) },
