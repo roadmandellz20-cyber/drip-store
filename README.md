@@ -33,7 +33,6 @@ RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 RESEND_FROM_NAME=Mugen District
 ADMIN_ORDER_EMAIL=
-RESEND_DOMAIN_VERIFIED=false
 EMAIL_DEBUG=false
 ```
 
@@ -44,7 +43,7 @@ EMAIL_DEBUG=false
 - Do not use personal Gmail addresses unless your Resend setup explicitly verifies/sends from that address.
 - Required sender: `Mugen District <orders@mugendistrict.com>`.
 - Do not use `onboarding@resend.dev` in production.
-- Customer emails are attempted only when `RESEND_DOMAIN_VERIFIED=true`.
+- Customer emails are attempted whenever the checkout or signup includes a recipient email.
 - Admin order emails are always attempted to `ADMIN_ORDER_EMAIL`.
 
 ## DNS Separation (Vercel + Resend)
@@ -95,6 +94,7 @@ Run SQL files in `supabase/migrations/` in order, then run `migrate_orders.sql` 
 - `20260226_master_schema_alignment.sql`
 - `20260301_waitlist.sql`
 - `20260301_waitlist_public_insert_policy.sql`
+- `20260302_align_catalog_prices.sql`
 
 Manual SQL Editor scripts:
 

@@ -24,6 +24,8 @@ export type Product = {
 export type ProductInventorySnapshot = {
   id?: string;
   slug: string;
+  name?: string;
+  price?: number;
   isLimited?: boolean;
   stockQty?: number | null;
   soldQty?: number;
@@ -110,6 +112,12 @@ export function applyProductInventory(
   snapshot?: ProductInventorySnapshot | Product | null
 ): Product {
   const isLimited = resolveLimitedFlag(product, snapshot);
+  const liveName =
+    typeof snapshot?.name === "string" && snapshot.name.trim() ? snapshot.name.trim() : product.name;
+  const livePrice =
+    typeof snapshot?.price === "number" && Number.isFinite(snapshot.price) && snapshot.price > 0
+      ? snapshot.price
+      : product.price;
   const stockQty = isLimited
     ? normalizeInt(snapshot?.stockQty) ?? normalizeInt(product.stockQty) ?? LIMITED_STOCK_QTY
     : null;
@@ -123,6 +131,8 @@ export function applyProductInventory(
 
   return {
     ...product,
+    name: liveName,
+    price: livePrice,
     limited: isLimited,
     isLimited,
     stockQty,

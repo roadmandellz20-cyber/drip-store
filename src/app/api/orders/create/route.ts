@@ -71,12 +71,6 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
-function asBooleanFlag(value: unknown) {
-  if (typeof value !== "string") return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-}
-
 function buildLaunchEnvPresence() {
   return {
     next_public_supabase_url: Boolean(asString(process.env.NEXT_PUBLIC_SUPABASE_URL)),
@@ -94,7 +88,6 @@ function buildLaunchEnvPresence() {
     resend_from_email: Boolean(asString(process.env.RESEND_FROM_EMAIL)),
     admin_order_email: Boolean(asString(process.env.ADMIN_ORDER_EMAIL)),
     inventory_tracking_enabled: Boolean(asString(process.env.INVENTORY_TRACKING_ENABLED)),
-    resend_domain_verified: Boolean(asString(process.env.RESEND_DOMAIN_VERIFIED)),
   };
 }
 
@@ -254,20 +247,11 @@ async function sendOrderEmails(params: {
   const result = {
     customer: "skipped" as "sent" | "failed" | "skipped",
     admin: "skipped" as "sent" | "failed" | "skipped",
-    customerSkippedByPolicy: false,
     errors: [] as string[],
   };
 
   const customerEmail = asString(params.shipping.email);
   const adminEmail = asString(process.env.ADMIN_ORDER_EMAIL);
-  const resendDomainVerified = asBooleanFlag(process.env.RESEND_DOMAIN_VERIFIED);
-  // In Resend test mode, you can only send to your own email until domain verification is complete.
-  const customerAllowedInTestMode =
-    !!customerEmail &&
-    !!adminEmail &&
-    customerEmail.toLowerCase() === adminEmail.toLowerCase();
-  const shouldSendCustomer =
-    !!customerEmail && (resendDomainVerified || customerAllowedInTestMode);
 
   const emailItems: EmailOrderItem[] = params.lines.map((line) => ({
     title: line.title,
@@ -293,19 +277,11 @@ async function sendOrderEmails(params: {
   };
 
   console.log("[orders/create] email_policy", {
-    resend_domain_verified: resendDomainVerified,
     has_customer_email: Boolean(customerEmail),
     has_admin_order_email: Boolean(adminEmail),
   });
 
-  if (customerEmail && !shouldSendCustomer) {
-    result.customerSkippedByPolicy = true;
-    console.log(
-      "[orders/create] customer email skipped: domain not verified and recipient is not admin email (Resend test-mode restriction)"
-    );
-  }
-
-  if (shouldSendCustomer) {
+  if (customerEmail) {
     try {
       const customerTemplate = customerOrderEmail(payload);
       const customerResult = await sendEmail({
@@ -601,13 +577,11 @@ export async function POST(request: Request) {
       resend_api_key: !!process.env.RESEND_API_KEY,
       resend_from_email: !!process.env.RESEND_FROM_EMAIL,
       admin_order_email: !!process.env.ADMIN_ORDER_EMAIL,
-      resend_domain_verified: !!process.env.RESEND_DOMAIN_VERIFIED,
     });
 
     let emailResult: Awaited<ReturnType<typeof sendOrderEmails>> = {
       customer: "skipped",
       admin: "skipped",
-      customerSkippedByPolicy: false,
       errors: [],
     };
 
@@ -625,7 +599,6 @@ export async function POST(request: Request) {
       emailResult = {
         customer: "failed",
         admin: "failed",
-        customerSkippedByPolicy: false,
         errors: [`unexpected_email_error: ${message}`],
       };
       console.error(`[orders/create] unexpected email pipeline error=${message}`);
@@ -634,13 +607,11 @@ export async function POST(request: Request) {
     const emailAdminSent = emailResult.admin === "sent";
     const emailCustomerSent = emailResult.customer === "sent";
     const derivedEmailStatus =
-      emailAdminSent && emailResult.customerSkippedByPolicy
-        ? "admin_sent_customer_skipped"
-        : emailResult.errors.length === 0
-          ? "sent"
-          : emailCustomerSent || emailAdminSent
-            ? "partial"
-            : "failed";
+      emailResult.errors.length === 0
+        ? "sent"
+        : emailCustomerSent || emailAdminSent
+          ? "partial"
+          : "failed";
     const emailError = emailResult.errors.length ? emailResult.errors.join(" | ") : null;
     const warning = emailError
       ? "Order was created but one or more emails failed to send."

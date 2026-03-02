@@ -12,12 +12,6 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function asBooleanFlag(value: unknown) {
-  if (typeof value !== "string") return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-}
-
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -118,10 +112,6 @@ export async function POST(request: Request) {
     const adminEmail =
       asString(process.env.NEWSLETTER_NOTIFY_EMAIL) ||
       asString(process.env.ADMIN_ORDER_EMAIL);
-    const resendDomainVerified = asBooleanFlag(process.env.RESEND_DOMAIN_VERIFIED);
-    const customerAllowedInTestMode =
-      !!adminEmail && email.toLowerCase() === adminEmail.toLowerCase();
-    const shouldSendCustomer = resendDomainVerified || customerAllowedInTestMode;
     let confirmationSent = false;
 
     if (adminEmail) {
@@ -140,37 +130,30 @@ export async function POST(request: Request) {
       console.log("[newsletter] signup", { email });
     }
 
-    if (!shouldSendCustomer) {
-      console.log(
-        "[newsletter] customer confirmation skipped: domain not verified and recipient is not admin email"
-      );
-    } else {
-      const unsubscribeAddress =
-        asString(process.env.RESEND_REPLY_TO) ||
-        adminEmail ||
-        "support@mugendistrict.com";
+    const unsubscribeAddress =
+      asString(process.env.RESEND_REPLY_TO) ||
+      adminEmail ||
+      "support@mugendistrict.com";
 
-      try {
-        await sendEmail({
-          to: email,
-          subject: "DROP SIGNAL CONFIRMED",
-          html: newsletterCustomerHtml(email),
-          text: "You're in. Watch your inbox.",
-          replyTo: unsubscribeAddress,
-          headers: {
-            "List-Unsubscribe": `<mailto:${unsubscribeAddress}?subject=unsubscribe>, <${getSiteUrl()}/about>`,
-          },
+    try {
+      await sendEmail({
+        to: email,
+        subject: "DROP SIGNAL CONFIRMED",
+        html: newsletterCustomerHtml(email),
+        text: "You're in. Watch your inbox.",
+        replyTo: unsubscribeAddress,
+        headers: {
+          "List-Unsubscribe": `<mailto:${unsubscribeAddress}?subject=unsubscribe>, <${getSiteUrl()}/about>`,
+        },
+      });
+      confirmationSent = true;
+    } catch (error) {
+      if (isResendTestingRestriction(error)) {
+        console.warn("[newsletter] customer confirmation suppressed by Resend test-mode policy", {
+          email,
         });
-        confirmationSent = true;
-      } catch (error) {
-        if (isResendTestingRestriction(error)) {
-          console.warn("[newsletter] customer confirmation suppressed by Resend test-mode policy", {
-            email,
-            resend_domain_verified: resendDomainVerified,
-          });
-        } else {
-          logEmailFailure("customer", error);
-        }
+      } else {
+        logEmailFailure("customer", error);
       }
     }
 

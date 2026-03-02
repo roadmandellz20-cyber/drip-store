@@ -32,10 +32,15 @@ function normalizeInventoryRow(row: Record<string, unknown>): ProductInventorySn
 
   const soldQtyRaw = asNumber(row.sold_qty);
   const soldQty = Number.isFinite(soldQtyRaw) ? Math.max(0, Math.floor(soldQtyRaw)) : 0;
+  const priceCentsRaw = asNumber(row.price_cents);
+  const price =
+    Number.isFinite(priceCentsRaw) && priceCentsRaw > 0 ? Math.round(priceCentsRaw) / 100 : undefined;
 
   const snapshot: ProductInventorySnapshot = {
     id: asString(row.id) || undefined,
     slug,
+    name: asString(row.title) || asString(row.name) || undefined,
+    price,
     isLimited,
     stockQty,
     soldQty,
@@ -72,7 +77,7 @@ export async function fetchProductInventorySnapshots(slugs?: string[]) {
   try {
     let primaryQuery = supabaseAdmin
       .from("products")
-      .select("id,slug,sku,status,is_limited,stock_qty,sold_qty");
+      .select("id,slug,sku,title,price_cents,status,is_limited,stock_qty,sold_qty");
 
     if (normalizedSlugs.length > 0) {
       primaryQuery = primaryQuery.in("slug", normalizedSlugs);
