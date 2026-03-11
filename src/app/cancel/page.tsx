@@ -7,7 +7,7 @@ export default function CancelPage() {
         <h1 className="page__title">ORDER CANCELED</h1>
         <p className="page__sub">No order was placed. You can continue shopping anytime.</p>
       </div>
-      <div className="checkout__side" style={{ maxWidth: 560 }}>
+      <div className="checkout__side checkout__side--narrow">
         <Link className="btn btn--primary" href="/store">
           RETURN TO STORE
         </Link>

@@ -12,15 +12,9 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-white/10 bg-black">
-      <div
-        className="mx-auto max-w-[760px] py-10"
-        style={{ paddingLeft: 16, paddingRight: 16 }}
-      >
-        <div
-          className="border border-white/10 bg-black/40"
-          style={{ padding: "24px 28px" }}
-        >
-          <div style={{ paddingLeft: 18, paddingRight: 18 }}>
+      <div className="footer__manifesto-shell mx-auto max-w-[760px] py-10">
+        <div className="footer__manifesto-card border border-white/10 bg-black/40">
+          <div className="footer__manifesto-body">
             <div className="text-sm font-semibold tracking-[0.2em] text-white">MANIFESTO</div>
             <p className="mt-3 text-sm font-normal leading-relaxed text-white/70">
               {"Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics. We don't just drop clothes; we archive movements. Established 2026. From the coast of Gambia to the heart of Shibuya."}

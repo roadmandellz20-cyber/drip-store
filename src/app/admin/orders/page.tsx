@@ -30,11 +30,11 @@ function normalizeStatus(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-function getStatusTone(status: string) {
-  if (status === "confirmed") return "#d9ffd0";
-  if (status === "cancelled") return "#ff9b9b";
-  if (status === "completed") return "#9fe3ff";
-  return "rgba(255,255,255,.78)";
+function getStatusClass(status: string) {
+  if (status === "confirmed") return "order-status order-status--confirmed";
+  if (status === "cancelled") return "order-status order-status--cancelled";
+  if (status === "completed") return "order-status order-status--completed";
+  return "order-status";
 }
 
 function getStateMessage(state?: string) {
@@ -76,7 +76,7 @@ export default async function AdminOrdersPage({
   const stateMessage = getStateMessage(resolvedSearchParams.state);
 
   return (
-    <main className="page" style={{ maxWidth: 980 }}>
+    <main className="page page--admin-wide">
       <div className="page__head">
         <h1 className="page__title">ADMIN ORDERS</h1>
         <p className="page__sub">Last 20 orders (debug view).</p>
@@ -112,14 +112,13 @@ export default async function AdminOrdersPage({
             const emailStatus = asString(row.email_status) || "-";
             const createdAt = asString(row.created_at);
             const status = normalizeStatus(row.status) || "pending";
-            const statusTone = getStatusTone(status);
             const canConfirm = status !== "confirmed" && status !== "completed";
             const canCancel = status !== "cancelled" && status !== "completed";
             const canDelete = true;
 
             return (
-              <article key={id} className="checkout__item" style={{ gridTemplateColumns: "1fr" }}>
-                <div className="checkout__row" style={{ justifyContent: "space-between" }}>
+              <article key={id} className="checkout__item checkout__item--stacked">
+                <div className="checkout__row checkout__row--space-between">
                   <strong>{orderNumber}</strong>
                   <span>{formatAmount(total, currency)}</span>
                 </div>
@@ -127,11 +126,11 @@ export default async function AdminOrdersPage({
                   {name} • {email}
                 </div>
                 <div className="checkout__row">
-                  status: <strong style={{ color: statusTone, textTransform: "uppercase" }}>{status}</strong>
+                  status: <strong className={getStatusClass(status)}>{status}</strong>
                 </div>
                 <div className="checkout__row">email_status: {emailStatus}</div>
                 <div className="checkout__row">created_at: {createdAt || "-"}</div>
-                <div className="checkout__row" style={{ gap: 10, flexWrap: "wrap" }}>
+                <div className="checkout__row checkout__row--admin-actions">
                   <Link className="btn btn--ghost" href={`/success?order_id=${encodeURIComponent(id)}`}>
                     VIEW
                   </Link>
@@ -152,15 +151,7 @@ export default async function AdminOrdersPage({
                   <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
                     <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
                     <input type="hidden" name="action" value="delete" />
-                    <button
-                      className="btn btn--ghost"
-                      type="submit"
-                      disabled={!canDelete}
-                      style={{
-                        borderColor: canDelete ? "rgba(255,107,107,.75)" : undefined,
-                        color: canDelete ? "#ff8f8f" : undefined,
-                      }}
-                    >
+                    <button className="btn btn--ghost btn--danger" type="submit" disabled={!canDelete}>
                       DELETE
                     </button>
                   </form>

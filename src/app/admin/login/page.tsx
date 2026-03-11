@@ -33,7 +33,7 @@ export default async function AdminLoginPage({
   const hasError = resolvedSearchParams.error === "invalid";
 
   return (
-    <main className="page" style={{ maxWidth: 560 }}>
+    <main className="page page--narrow">
       <div className="page__head">
         <div className="page__kicker">Admin Access</div>
         <h1 className="page__title">AUTHORIZED LOGIN</h1>

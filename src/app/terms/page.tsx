@@ -16,7 +16,7 @@ export default function TermsPage() {
 
       <section className="panel">
         <div className="panel__line" />
-        <div className="panel__body" style={{ display: "grid", gap: 20 }}>
+        <div className="panel__body panel__body--legal">
           <div>
             <h2 className="page__kicker">Orders</h2>
             <p className="muted">

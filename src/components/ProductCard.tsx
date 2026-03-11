@@ -43,10 +43,12 @@ export default function ProductCard({
   const addDisabled = !launchLive || soldOutUi;
   const showLaunchNote = product.isLimited && !launchLive;
 
-  const tilt = useMemo(() => {
+  const tiltClass = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    const deg = ((seed % 7) - 3) * 0.6;
-    return deg;
+    const offset = (seed % 7) - 3;
+    if (offset < 0) return `p-card--tilt-n${Math.abs(offset)}`;
+    if (offset > 0) return `p-card--tilt-p${offset}`;
+    return "p-card--tilt-0";
   }, [product.id]);
 
   const onCop = () => {
@@ -70,8 +72,7 @@ export default function ProductCard({
   return (
     <article
       ref={cardRef}
-      className={`p-card ${product.isLimited ? "p-card--limited" : "p-card--available"} ${soldOutUi ? "p-card--soldout" : ""}`}
-      style={{ transform: `rotate(${tilt}deg)` }}
+      className={`p-card ${tiltClass} ${product.isLimited ? "p-card--limited" : "p-card--available"} ${soldOutUi ? "p-card--soldout" : ""}`}
       onMouseEnter={() => {
         setHover(true);
         warmDetailAssets();

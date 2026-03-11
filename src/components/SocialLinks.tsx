@@ -13,38 +13,19 @@ export default function SocialLinks({ variant = "header", className = "" }: Prop
   const base =
     "inline-flex items-center gap-2 rounded-md border border-white/15 bg-black/40 px-3 py-2 text-xs tracking-widest uppercase text-white/90 hover:border-white/35 hover:text-white transition";
 
-  const btn = variant === "footer" ? "" : base;
-  const wrapper = variant === "footer" ? className : `flex items-center gap-2 ${className}`;
-  const footerWrapStyle =
+  const btn = variant === "footer" ? "social-link--footer" : base;
+  const wrapper =
     variant === "footer"
-      ? {
-          display: "grid",
-          gap: "14px",
-          justifyItems: "start",
-          alignItems: "start",
-          opacity: 1,
-        }
-      : undefined;
-  const footerLinkStyle =
-    variant === "footer"
-      ? {
-          display: "block",
-          color: "#ffffff",
-          textDecoration: "none",
-          letterSpacing: "0.16em",
-          textTransform: "uppercase" as const,
-          lineHeight: 1.2,
-        }
-      : undefined;
+      ? `social-links social-links--footer ${className}`.trim()
+      : `flex items-center gap-2 ${className}`.trim();
 
   return (
-    <div className={wrapper} style={footerWrapStyle}>
+    <div className={wrapper}>
       <Link
         href={IG_URL}
         target="_blank"
         rel="noopener noreferrer"
         className={btn}
-        style={footerLinkStyle}
         aria-label="Mugen District on Instagram"
         title="Follow the archive"
       >
@@ -63,7 +44,6 @@ export default function SocialLinks({ variant = "header", className = "" }: Prop
         target="_blank"
         rel="noopener noreferrer"
         className={btn}
-        style={footerLinkStyle}
         aria-label="Message Mugen District on WhatsApp"
         title="Order support"
       >
