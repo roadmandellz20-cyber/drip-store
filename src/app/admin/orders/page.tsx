@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
+import {
+  ADMIN_CSRF_FORM_FIELD,
+  ADMIN_SESSION_COOKIE,
+  createAdminCsrfToken,
+  verifyAdminSession,
+} from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const metadata: Metadata = {
@@ -39,6 +44,7 @@ function getStateMessage(state?: string) {
   if (state === "locked") return { tone: "error", text: "Completed orders are locked. Delete them instead." };
   if (state === "missing") return { tone: "error", text: "Order not found." };
   if (state === "invalid") return { tone: "error", text: "Invalid admin action." };
+  if (state === "csrf") return { tone: "error", text: "Security check failed. Try again." };
   if (state === "error") return { tone: "error", text: "Admin action failed." };
   return null;
 }
@@ -52,6 +58,11 @@ export default async function AdminOrdersPage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
 
   if (!(await verifyAdminSession(sessionCookie))) {
+    redirect("/admin/login?redirect=/admin/orders");
+  }
+
+  const csrfToken = await createAdminCsrfToken(sessionCookie);
+  if (!csrfToken) {
     redirect("/admin/login?redirect=/admin/orders");
   }
 
@@ -70,9 +81,12 @@ export default async function AdminOrdersPage({
         <h1 className="page__title">ADMIN ORDERS</h1>
         <p className="page__sub">Last 20 orders (debug view).</p>
         <div className="page__actions">
-          <Link className="btn btn--ghost" href="/api/admin/logout">
-            LOG OUT
-          </Link>
+          <form action="/api/admin/logout" method="post">
+            <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
+            <button className="btn btn--ghost" type="submit">
+              LOG OUT
+            </button>
+          </form>
         </div>
       </div>
 
@@ -83,7 +97,7 @@ export default async function AdminOrdersPage({
       ) : null}
 
       {query.error ? (
-        <div className="checkout__error">{query.error.message}</div>
+        <div className="checkout__error">Unable to load orders right now.</div>
       ) : rows.length === 0 ? (
         <div className="checkout__note">No orders found.</div>
       ) : (
@@ -109,7 +123,9 @@ export default async function AdminOrdersPage({
                   <strong>{orderNumber}</strong>
                   <span>{formatAmount(total, currency)}</span>
                 </div>
-                <div className="checkout__row">{name} • {email}</div>
+                <div className="checkout__row">
+                  {name} • {email}
+                </div>
                 <div className="checkout__row">
                   status: <strong style={{ color: statusTone, textTransform: "uppercase" }}>{status}</strong>
                 </div>
@@ -120,18 +136,21 @@ export default async function AdminOrdersPage({
                     VIEW
                   </Link>
                   <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
+                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
                     <input type="hidden" name="action" value="confirm" />
                     <button className="btn btn--primary" type="submit" disabled={!canConfirm}>
                       CONFIRM
                     </button>
                   </form>
                   <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
+                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
                     <input type="hidden" name="action" value="cancel" />
                     <button className="btn btn--ghost" type="submit" disabled={!canCancel}>
                       CANCEL
                     </button>
                   </form>
                   <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
+                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
                     <input type="hidden" name="action" value="delete" />
                     <button
                       className="btn btn--ghost"

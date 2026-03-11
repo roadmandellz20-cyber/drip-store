@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
+import {
+  ADMIN_CSRF_FORM_FIELD,
+  ADMIN_SESSION_COOKIE,
+  isSameOriginRequest,
+  verifyAdminCsrfToken,
+  verifyAdminSession,
+} from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -22,6 +28,10 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOriginRequest(request)) {
+    return redirectToOrders(request, "csrf");
+  }
+
   const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
   if (!(await verifyAdminSession(sessionCookie))) {
@@ -38,6 +48,11 @@ export async function POST(
   }
 
   const formData = await request.formData();
+  const csrfToken = asString(formData.get(ADMIN_CSRF_FORM_FIELD));
+  if (!(await verifyAdminCsrfToken(sessionCookie, csrfToken))) {
+    return redirectToOrders(request, "csrf");
+  }
+
   const action = asString(formData.get("action")).toLowerCase();
 
   if (!["confirm", "cancel", "delete"].includes(action)) {

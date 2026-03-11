@@ -8,8 +8,17 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function escapeHtml(input: string) {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return value.length > 3 && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function errorMessage(error: unknown) {
@@ -35,12 +44,8 @@ function isResendTestingRestriction(error: unknown) {
 }
 
 async function loadSupabaseAdmin() {
-  try {
-    const mod = await import("@/lib/supabase-admin");
-    return mod.supabaseAdmin;
-  } catch (error) {
-    throw new Error(errorMessage(error));
-  }
+  const mod = await import("@/lib/supabase-admin");
+  return mod.supabaseAdmin;
 }
 
 async function persistNewsletterSignup(email: string) {
@@ -52,7 +57,7 @@ async function persistNewsletterSignup(email: string) {
   });
 
   if (error) {
-    throw error;
+    throw new Error("waitlist_insert_failed");
   }
 }
 
@@ -72,25 +77,29 @@ function logEmailFailure(kind: "admin" | "customer", error: unknown) {
 }
 
 function newsletterAdminHtml(email: string) {
+  const safeEmail = escapeHtml(email);
+
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#050505;color:#fff;padding:24px;">
       <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.65);">Drop Signal</div>
       <h1 style="margin:12px 0 8px;font-size:28px;line-height:1.1;">New newsletter signup</h1>
       <p style="margin:0 0 16px;color:rgba(255,255,255,.78);">A new email joined the Mugen District drop list.</p>
       <div style="padding:14px 16px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);font-size:18px;font-weight:700;">
-        ${email}
+        ${safeEmail}
       </div>
     </div>
   `;
 }
 
 function newsletterCustomerHtml(email: string) {
+  const safeEmail = escapeHtml(email);
+
   return `
     <div style="font-family:Arial,Helvetica,sans-serif;background:#050505;color:#fff;padding:24px;">
       <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.65);">Mugen District</div>
       <h1 style="margin:12px 0 8px;font-size:28px;line-height:1.1;">DROP SIGNAL CONFIRMED</h1>
       <p style="margin:0 0 12px;color:rgba(255,255,255,.82);">Early access. Password drops. Zero noise.</p>
-      <p style="margin:0 0 12px;color:rgba(255,255,255,.7);">You're in with <strong>${email}</strong>. Watch your inbox.</p>
+      <p style="margin:0 0 12px;color:rgba(255,255,255,.7);">You're in with <strong>${safeEmail}</strong>. Watch your inbox.</p>
     </div>
   `;
 }
@@ -162,7 +171,7 @@ export async function POST(request: Request) {
       message: confirmationSent ? "You're in. Watch your inbox." : "You're in.",
     });
   } catch (error) {
-    console.error(`[newsletter] persistence failed: ${errorMessage(error)}`);
+    console.error("[newsletter] persistence failed", error);
     return NextResponse.json(
       { ok: false, error: "Signup failed. Try again in a minute." },
       { status: 500 }

@@ -3,63 +3,71 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PRODUCT_SKU_RE = /^[a-z0-9-]{1,64}$/;
 const ALLOWED_SOURCES = new Set(["store", "product"]);
-const RATE_LIMIT_WINDOW_MS = 20_000;
-const waitlistIpLog = new Map<string, number>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+
+type IpRateLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const waitlistIpLog = new Map<string, IpRateLimitEntry>();
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  if (error && typeof error === "object") {
-    const message = "message" in error ? asString(error.message) : "";
-    const details = "details" in error ? asString(error.details) : "";
-    const hint = "hint" in error ? asString(error.hint) : "";
-
-    return message || details || hint || "Waitlist signup failed.";
-  }
-
-  return "Waitlist signup failed.";
+async function loadSupabaseAdmin() {
+  const mod = await import("@/lib/supabase-admin");
+  return mod.supabaseAdmin;
 }
 
-async function loadSupabaseAdmin() {
-  try {
-    const mod = await import("@/lib/supabase-admin");
-    return mod.supabaseAdmin;
-  } catch (error) {
-    throw new Error(getErrorMessage(error));
-  }
+function normalizeIp(ip: string) {
+  const raw = ip.trim();
+  if (!raw) return "unknown";
+  return raw.startsWith("::ffff:") ? raw.slice(7) : raw;
 }
 
 function getClientIp(request: Request) {
   const forwardedFor = asString(request.headers.get("x-forwarded-for"));
   if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
+    return normalizeIp(forwardedFor.split(",")[0] || "");
   }
 
   const realIp = asString(request.headers.get("x-real-ip"));
-  return realIp || "unknown";
+  return normalizeIp(realIp || "unknown");
 }
 
 function isRateLimited(ip: string, now = Date.now()) {
-  waitlistIpLog.forEach((timestamp, key) => {
-    if (now - timestamp > RATE_LIMIT_WINDOW_MS) {
+  waitlistIpLog.forEach((entry, key) => {
+    if (entry.resetAt <= now) {
       waitlistIpLog.delete(key);
     }
   });
 
-  const previous = waitlistIpLog.get(ip);
-  if (previous && now - previous < RATE_LIMIT_WINDOW_MS) {
+  const entry = waitlistIpLog.get(ip);
+  if (!entry) {
+    waitlistIpLog.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
     return true;
   }
 
-  waitlistIpLog.set(ip, now);
+  entry.count += 1;
   return false;
+}
+
+function isValidContact(contact: string) {
+  return contact.length > 3 && contact.length <= 254 && EMAIL_RE.test(contact);
+}
+
+function isValidProductSku(productSku: string) {
+  if (!productSku) return true;
+  return PRODUCT_SKU_RE.test(productSku);
 }
 
 export async function POST(request: Request) {
@@ -72,9 +80,9 @@ export async function POST(request: Request) {
 
     const contact = asString(body.contact).toLowerCase();
     const source = asString(body.source).toLowerCase();
-    const productSku = asString(body.productSku);
+    const productSku = asString(body.productSku).toLowerCase();
 
-    if (!EMAIL_RE.test(contact)) {
+    if (!isValidContact(contact)) {
       return NextResponse.json({ ok: false, error: "Enter a valid email." }, { status: 400 });
     }
 
@@ -82,11 +90,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Invalid archive source." }, { status: 400 });
     }
 
+    if (!isValidProductSku(productSku)) {
+      return NextResponse.json({ ok: false, error: "Invalid product SKU." }, { status: 400 });
+    }
+
     const ip = getClientIp(request);
     if (isRateLimited(ip)) {
       return NextResponse.json(
         { ok: false, error: "Hold for a moment before hitting the archive again." },
-        { status: 429 }
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
+          },
+        }
       );
     }
 
@@ -99,12 +116,13 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      throw error;
+      console.error("[waitlist] insert failed", error);
+      return NextResponse.json({ ok: false, error: "Waitlist signup failed." }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = getErrorMessage(error);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    console.error("[waitlist] request failed", error);
+    return NextResponse.json({ ok: false, error: "Waitlist signup failed." }, { status: 500 });
   }
 }

@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load products.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api/products] failed", error);
+    return NextResponse.json({ error: "Failed to load products." }, { status: 500 });
   }
 }

@@ -1,14 +1,40 @@
-// src/app/api/debug/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 import { getSupabaseServerConfig, supabaseServer } from "@/lib/supabase-server";
 
-export const runtime = "nodejs"; // keep it simple
+export const runtime = "nodejs";
 
-export async function GET() {
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function isDebugRouteEnabled() {
+  const enabled = asString(process.env.ENABLE_DEBUG_ROUTES).toLowerCase();
+  return process.env.NODE_ENV !== "production" && enabled === "true";
+}
+
+async function requireDebugAccess(request: NextRequest) {
+  if (!isDebugRouteEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!(await verifyAdminSession(sessionCookie))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const denied = await requireDebugAccess(request);
+  if (denied) {
+    return denied;
+  }
+
   const { url, key } = getSupabaseServerConfig();
-  const serviceRole = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  const serviceRole = asString(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  // Don’t leak secrets
   const anonPreview = key ? `${key.slice(0, 6)}...${key.slice(-6)}` : "";
 
   if (!url || !key) {

@@ -1,10 +1,30 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
+
 const VERIFIED_FROM = "Mugen District <orders@mugendistrict.com>";
 
 function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function isDebugRouteEnabled() {
+  const enabled = asString(process.env.ENABLE_DEBUG_ROUTES).toLowerCase();
+  return process.env.NODE_ENV !== "production" && enabled === "true";
+}
+
+async function requireDebugAccess(request: NextRequest) {
+  if (!isDebugRouteEnabled()) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!(await verifyAdminSession(sessionCookie))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return null;
 }
 
 function getDebugSender() {
@@ -95,13 +115,23 @@ async function sendDebugEmail(toOverride: string) {
   );
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const denied = await requireDebugAccess(request);
+  if (denied) {
+    return denied;
+  }
+
   const url = new URL(request.url);
   const to = asString(url.searchParams.get("to"));
   return sendDebugEmail(to);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const denied = await requireDebugAccess(request);
+  if (denied) {
+    return denied;
+  }
+
   const body = (await request.json().catch(() => ({}))) as { to?: string };
   return sendDebugEmail(asString(body.to));
 }

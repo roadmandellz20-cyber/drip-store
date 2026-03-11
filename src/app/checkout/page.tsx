@@ -214,8 +214,7 @@ export default function CheckoutPage() {
           orderRef,
           currency: "GMD",
           total,
-          shipping,
-          items: displayItems,
+          itemCount: displayItems.length,
         })
       );
       clearCart();
