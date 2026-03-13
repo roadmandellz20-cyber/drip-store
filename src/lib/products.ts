@@ -1,3 +1,5 @@
+import { sanitizeIdInput, sanitizeSlugInput, sanitizeSingleLineInput } from "@/lib/input";
+
 export type Product = {
   id: string;
   sku: string;
@@ -113,7 +115,7 @@ export function applyProductInventory(
 ): Product {
   const isLimited = resolveLimitedFlag(product, snapshot);
   const liveName =
-    typeof snapshot?.name === "string" && snapshot.name.trim() ? snapshot.name.trim() : product.name;
+    sanitizeSingleLineInput(snapshot?.name, { maxLength: 160 }) || product.name;
   const livePrice =
     typeof snapshot?.price === "number" && Number.isFinite(snapshot.price) && snapshot.price > 0
       ? snapshot.price
@@ -340,11 +342,13 @@ const BASE_PRODUCTS: Product[] = [
 
 export const ALL_PRODUCTS = BASE_PRODUCTS.map((product) => applyProductInventory(product));
 export const getProduct = (id: string) => {
-  const product = ALL_PRODUCTS.find((item) => item.id === id);
+  const normalizedId = sanitizeIdInput(id, 64);
+  const product = ALL_PRODUCTS.find((item) => item.id === normalizedId);
   return product ? applyProductInventory(product) : undefined;
 };
 export const getProductBySku = (sku: string) => {
-  const product = ALL_PRODUCTS.find((item) => item.sku.toLowerCase() === sku.trim().toLowerCase());
+  const normalizedSku = sanitizeSlugInput(sku, 64);
+  const product = ALL_PRODUCTS.find((item) => item.sku.toLowerCase() === normalizedSku);
   return product ? applyProductInventory(product) : undefined;
 };
 export const NEW_PRODUCTS = ALL_PRODUCTS.filter((product) => product.isNew);

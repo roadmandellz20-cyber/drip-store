@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { ResendRequestError, sendEmail } from "@/lib/email/send";
+import { sanitizeEmailInput, sanitizeSingleLineInput } from "@/lib/input";
 import { getSiteUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function escapeHtml(input: string) {
@@ -107,7 +108,7 @@ function newsletterCustomerHtml(email: string) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json().catch(() => ({}))) as { email?: string };
-    const email = asString(body.email).toLowerCase();
+    const email = sanitizeEmailInput(body.email);
 
     if (!isValidEmail(email)) {
       return NextResponse.json(

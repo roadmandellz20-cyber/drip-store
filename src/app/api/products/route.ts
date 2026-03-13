@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sanitizeSlugListInput } from "@/lib/input";
 import { fetchProductsWithInventory } from "@/lib/products-server";
 
 export const runtime = "nodejs";
@@ -6,11 +7,7 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const slugs = searchParams
-      .get("slugs")
-      ?.split(",")
-      .map((slug) => slug.trim().toLowerCase())
-      .filter(Boolean);
+    const slugs = sanitizeSlugListInput(searchParams.get("slugs"));
 
     const products = await fetchProductsWithInventory(slugs);
 

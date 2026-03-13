@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
+import { sanitizeEmailInput, sanitizeSingleLineInput } from "@/lib/input";
 
 export const runtime = "nodejs";
 
 const VERIFIED_FROM = "Mugen District <orders@mugendistrict.com>";
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function isDebugRouteEnabled() {
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
   }
 
   const url = new URL(request.url);
-  const to = asString(url.searchParams.get("to"));
+  const to = sanitizeEmailInput(url.searchParams.get("to"));
   return sendDebugEmail(to);
 }
 
@@ -133,5 +134,5 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json().catch(() => ({}))) as { to?: string };
-  return sendDebugEmail(asString(body.to));
+  return sendDebugEmail(sanitizeEmailInput(body.to));
 }

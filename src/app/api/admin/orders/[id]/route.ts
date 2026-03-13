@@ -6,16 +6,17 @@ import {
   verifyAdminCsrfToken,
   verifyAdminSession,
 } from "@/lib/admin-auth";
+import { sanitizeIdInput, sanitizeSingleLineInput } from "@/lib/input";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
 function asString(value: FormDataEntryValue | null) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function normalizeStatus(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
+  return sanitizeSingleLineInput(value, { lowercase: true });
 }
 
 function redirectToOrders(request: NextRequest, state: string) {
@@ -41,7 +42,7 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const orderId = id.trim();
+  const orderId = sanitizeIdInput(id, 120);
 
   if (!orderId) {
     return redirectToOrders(request, "invalid");
@@ -53,7 +54,10 @@ export async function POST(
     return redirectToOrders(request, "csrf");
   }
 
-  const action = asString(formData.get("action")).toLowerCase();
+  const action = sanitizeSingleLineInput(formData.get("action"), {
+    lowercase: true,
+    maxLength: 16,
+  });
 
   if (!["confirm", "cancel", "delete"].includes(action)) {
     return redirectToOrders(request, "invalid");

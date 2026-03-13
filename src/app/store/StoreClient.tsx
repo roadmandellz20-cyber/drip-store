@@ -5,6 +5,7 @@ import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductGrid from "@/components/ProductGrid";
 import WaitlistModal from "@/components/WaitlistModal";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
+import { sanitizeSearchInput } from "@/lib/input";
 import { type Product } from "@/lib/products";
 
 export default function StoreClient({ products }: { products: Product[] }) {
@@ -13,7 +14,7 @@ export default function StoreClient({ products }: { products: Product[] }) {
   const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const filtered = useMemo(() => {
-    const search = q.trim().toLowerCase();
+    const search = sanitizeSearchInput(q, 80).toLowerCase();
     if (!search) return products;
 
     return products.filter(
@@ -47,7 +48,7 @@ export default function StoreClient({ products }: { products: Product[] }) {
           <input
             className="searchbar__input"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => setQ(sanitizeSearchInput(e.target.value, 80))}
             placeholder="Search the full district by name or SKU…"
           />
         </div>

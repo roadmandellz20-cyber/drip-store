@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  sanitizeEmailInput,
+  sanitizeIpInput,
+  sanitizeSingleLineInput,
+  sanitizeSlugInput,
+} from "@/lib/input";
 
 export const runtime = "nodejs";
 
@@ -16,7 +22,7 @@ type IpRateLimitEntry = {
 const waitlistIpLog = new Map<string, IpRateLimitEntry>();
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 async function loadSupabaseAdmin() {
@@ -25,9 +31,7 @@ async function loadSupabaseAdmin() {
 }
 
 function normalizeIp(ip: string) {
-  const raw = ip.trim();
-  if (!raw) return "unknown";
-  return raw.startsWith("::ffff:") ? raw.slice(7) : raw;
+  return sanitizeIpInput(ip);
 }
 
 function getClientIp(request: Request) {
@@ -78,9 +82,12 @@ export async function POST(request: Request) {
       productSku?: string | null;
     };
 
-    const contact = asString(body.contact).toLowerCase();
-    const source = asString(body.source).toLowerCase();
-    const productSku = asString(body.productSku).toLowerCase();
+    const contact = sanitizeEmailInput(body.contact);
+    const source = sanitizeSingleLineInput(body.source, {
+      lowercase: true,
+      maxLength: 32,
+    });
+    const productSku = sanitizeSlugInput(body.productSku, 64);
 
     if (!isValidContact(contact)) {
       return NextResponse.json({ ok: false, error: "Enter a valid email." }, { status: 400 });

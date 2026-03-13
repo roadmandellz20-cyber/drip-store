@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
+import { sanitizeEmailInput, sanitizeSlugInput } from "@/lib/input";
 
 type WaitlistModalProps = {
   open: boolean;
@@ -59,7 +60,7 @@ export default function WaitlistModal({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const normalized = contact.trim().toLowerCase();
+    const normalized = sanitizeEmailInput(contact);
 
     if (!EMAIL_RE.test(normalized)) {
       setError("Enter a valid email.");
@@ -78,7 +79,7 @@ export default function WaitlistModal({
         body: JSON.stringify({
           contact: normalized,
           source,
-          productSku,
+          productSku: sanitizeSlugInput(productSku, 64),
         }),
       });
 
@@ -139,7 +140,7 @@ export default function WaitlistModal({
             autoComplete="email"
             placeholder="you@domain.com"
             value={contact}
-            onChange={(event) => setContact(event.target.value)}
+            onChange={(event) => setContact(sanitizeEmailInput(event.target.value))}
             disabled={status === "loading"}
           />
 

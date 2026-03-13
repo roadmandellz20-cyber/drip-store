@@ -19,6 +19,13 @@ import {
   shouldSendCustomerConfirmation,
   type DeliveryStatus,
 } from "@/lib/orders/email-state";
+import {
+  sanitizeEmailInput,
+  sanitizeIdInput,
+  sanitizeMultilineInput,
+  sanitizeSingleLineInput,
+  sanitizeSlugInput,
+} from "@/lib/input";
 
 export const runtime = "nodejs";
 
@@ -105,7 +112,7 @@ type OrderEmailResult = {
 };
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function asNumber(value: unknown) {
@@ -196,13 +203,16 @@ function normalizeProduct(row: Record<string, unknown>): ProductRow | null {
 
 function formatAddress(shipping: IncomingShipping) {
   const lines = [
-    asString(shipping.address1),
-    asString(shipping.address2),
-    [asString(shipping.city), asString(shipping.region)]
+    sanitizeSingleLineInput(shipping.address1, { maxLength: 160 }),
+    sanitizeSingleLineInput(shipping.address2, { maxLength: 160 }),
+    [
+      sanitizeSingleLineInput(shipping.city, { maxLength: 80 }),
+      sanitizeSingleLineInput(shipping.region, { maxLength: 80 }),
+    ]
       .filter(Boolean)
       .join(", "),
-    asString(shipping.postalCode),
-    asString(shipping.country),
+    sanitizeSingleLineInput(shipping.postalCode, { maxLength: 24 }),
+    sanitizeSingleLineInput(shipping.country, { maxLength: 80 }),
   ].filter(Boolean);
 
   return lines.join("\n");
@@ -210,15 +220,18 @@ function formatAddress(shipping: IncomingShipping) {
 
 function normalizeIncomingRef(item: IncomingItem) {
   return (
-    asString(item.productId) ||
-    asString(item.id) ||
-    asString(item.slug) ||
-    asString(item.sku)
+    sanitizeIdInput(item.productId, 120) ||
+    sanitizeIdInput(item.id, 120) ||
+    sanitizeSlugInput(item.slug, 64) ||
+    sanitizeSlugInput(item.sku, 64)
   );
 }
 
 function normalizeSize(size: unknown) {
-  const value = asString(size).toUpperCase();
+  const value = sanitizeSingleLineInput(size, {
+    uppercase: true,
+    maxLength: 10,
+  });
   if (!value) return "M";
   return value.slice(0, 10);
 }
@@ -237,6 +250,32 @@ function isShippingValid(shipping: IncomingShipping) {
 function makeOrderRef(orderId: string) {
   const token = orderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
   return `MGN-${token || "00000000"}`;
+}
+
+function sanitizeShipping(shipping: IncomingShipping): IncomingShipping {
+  return {
+    name: sanitizeSingleLineInput(shipping.name, { maxLength: 120 }),
+    email: sanitizeEmailInput(shipping.email),
+    phone: sanitizeSingleLineInput(shipping.phone, { maxLength: 40 }),
+    address1: sanitizeSingleLineInput(shipping.address1, { maxLength: 160 }),
+    address2: sanitizeSingleLineInput(shipping.address2, { maxLength: 160 }),
+    city: sanitizeSingleLineInput(shipping.city, { maxLength: 80 }),
+    region: sanitizeSingleLineInput(shipping.region, { maxLength: 80 }),
+    postalCode: sanitizeSingleLineInput(shipping.postalCode, { maxLength: 24 }),
+    country: sanitizeSingleLineInput(shipping.country, { maxLength: 80 }),
+    deliveryNote: sanitizeMultilineInput(shipping.deliveryNote, { maxLength: 500 }),
+  };
+}
+
+function sanitizeIncomingCart(items: IncomingItem[]) {
+  return items.map((item) => ({
+    id: sanitizeIdInput(item.id, 120),
+    productId: sanitizeIdInput(item.productId, 120),
+    slug: sanitizeSlugInput(item.slug, 64),
+    sku: sanitizeSlugInput(item.sku, 64),
+    size: sanitizeSingleLineInput(item.size, { uppercase: true, maxLength: 10 }),
+    qty: asNumber(item.qty),
+  }));
 }
 
 async function fetchProductsFromSupabase() {
@@ -694,17 +733,19 @@ export async function POST(request: Request) {
       idempotencyKey?: string;
     };
 
-    const shipping = body.shipping || {};
-    const cart = Array.isArray(body.cart)
-      ? body.cart
-      : Array.isArray(body.items)
-        ? body.items
-        : [];
+    const shipping = sanitizeShipping(body.shipping || {});
+    const rawCart = Array.isArray(body.cart) ? body.cart : Array.isArray(body.items) ? body.items : [];
+    const cart = sanitizeIncomingCart(rawCart);
 
     const idempotencyKey =
-      asString(request.headers.get("Idempotency-Key")) || asString(body.idempotencyKey);
+      sanitizeSingleLineInput(request.headers.get("Idempotency-Key"), {
+        collapseWhitespace: false,
+      }) ||
+      sanitizeSingleLineInput(body.idempotencyKey, {
+        collapseWhitespace: false,
+      });
 
-    if (idempotencyKey && idempotencyKey.length > 120) {
+    if (idempotencyKey.length > 120) {
       return NextResponse.json(
         { error: "Invalid idempotency key." },
         { status: 400 }

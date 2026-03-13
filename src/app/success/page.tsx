@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { sanitizeIdInput } from "@/lib/input";
 import SuccessClient from "./SuccessClient";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,7 @@ type SuccessPageProps = {
 };
 
 function pickParam(value: string | string[] | undefined) {
-  return typeof value === "string"
-    ? value.trim()
-    : Array.isArray(value)
-      ? value[0]?.trim() || ""
-      : "";
+  return sanitizeIdInput(typeof value === "string" ? value : Array.isArray(value) ? value[0] : "", 120);
 }
 
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {

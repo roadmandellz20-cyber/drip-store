@@ -1,9 +1,10 @@
 import "server-only";
 
+import { sanitizeSingleLineInput, sanitizeSlugInput } from "@/lib/input";
 import { ALL_PRODUCTS, mergeProductInventory, type ProductInventorySnapshot } from "@/lib/products";
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function asNumber(value: unknown) {
@@ -66,7 +67,7 @@ async function loadSupabaseAdmin() {
 
 export async function fetchProductInventorySnapshots(slugs?: string[]) {
   const normalizedSlugs = Array.from(
-    new Set((slugs || []).map((slug) => slug.trim().toLowerCase()).filter(Boolean))
+    new Set((slugs || []).map((slug) => sanitizeSlugInput(slug, 64)).filter(Boolean))
   );
 
   const supabaseAdmin = await loadSupabaseAdmin();
@@ -102,7 +103,7 @@ export async function fetchProductInventorySnapshots(slugs?: string[]) {
 }
 
 export async function fetchProductsWithInventory(slugs?: string[]) {
-  const normalizedSlugs = (slugs || []).map((slug) => slug.trim().toLowerCase()).filter(Boolean);
+  const normalizedSlugs = (slugs || []).map((slug) => sanitizeSlugInput(slug, 64)).filter(Boolean);
   const baseProducts =
     normalizedSlugs.length > 0
       ? ALL_PRODUCTS.filter((product) => normalizedSlugs.includes(product.sku.toLowerCase()))

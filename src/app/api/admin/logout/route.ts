@@ -6,11 +6,12 @@ import {
   isSameOriginRequest,
   verifyAdminCsrfToken,
 } from "@/lib/admin-auth";
+import { sanitizeSingleLineInput } from "@/lib/input";
 
 export const runtime = "nodejs";
 
 function asString(value: FormDataEntryValue | null) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 export async function POST(request: NextRequest) {

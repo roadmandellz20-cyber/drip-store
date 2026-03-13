@@ -1,3 +1,5 @@
+import { sanitizeEmailInput, sanitizeSingleLineInput } from "@/lib/input";
+
 const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 export const ADMIN_SESSION_COOKIE = "mugen_admin_session";
@@ -29,11 +31,11 @@ function getDecoder() {
 }
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function normalizeEmail(value: string) {
-  return value.trim().toLowerCase();
+  return sanitizeEmailInput(value);
 }
 
 function normalizeBase64(value: string) {
@@ -275,11 +277,19 @@ export function getAdminCookieOptions() {
 }
 
 export function isSafeAdminRedirect(value?: string | null) {
-  return typeof value === "string" && value.startsWith("/admin") && !value.startsWith("//");
+  const normalized = sanitizeSingleLineInput(value, {
+    collapseWhitespace: false,
+    maxLength: 256,
+  });
+  return normalized.startsWith("/admin") && !normalized.startsWith("//");
 }
 
 function normalizeHost(value: string) {
-  return value.trim().toLowerCase();
+  return sanitizeSingleLineInput(value, {
+    collapseWhitespace: false,
+    lowercase: true,
+    maxLength: 255,
+  });
 }
 
 function getRequestHost(request: Request) {

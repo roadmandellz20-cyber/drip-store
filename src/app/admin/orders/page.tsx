@@ -8,6 +8,7 @@ import {
   createAdminCsrfToken,
   verifyAdminSession,
 } from "@/lib/admin-auth";
+import { sanitizeSingleLineInput } from "@/lib/input";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function formatAmount(cents: number, currency: string) {
@@ -27,7 +28,7 @@ function formatAmount(cents: number, currency: string) {
 }
 
 function normalizeStatus(value: unknown) {
-  return typeof value === "string" ? value.trim().toLowerCase() : "";
+  return sanitizeSingleLineInput(value, { lowercase: true });
 }
 
 function getStatusClass(status: string) {
@@ -73,7 +74,12 @@ export default async function AdminOrdersPage({
     .limit(20);
 
   const rows = (query.data as Array<Record<string, unknown>> | null) || [];
-  const stateMessage = getStateMessage(resolvedSearchParams.state);
+  const stateMessage = getStateMessage(
+    sanitizeSingleLineInput(resolvedSearchParams.state, {
+      lowercase: true,
+      maxLength: 32,
+    })
+  );
 
   return (
     <main className="page page--admin-wide">

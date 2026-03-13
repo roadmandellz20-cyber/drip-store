@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ProductDetailClient from "./ProductDetailClient";
+import { sanitizeSlugInput } from "@/lib/input";
 import { getProduct, getRelatedProducts } from "@/lib/products";
 import { fetchProductsWithInventory } from "@/lib/products-server";
 import { absoluteUrl, extractSummary } from "@/lib/site";
@@ -13,7 +14,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const resolvedParams = await params;
-  const product = getProduct(resolvedParams.id);
+  const product = getProduct(sanitizeSlugInput(resolvedParams.id, 64));
 
   if (!product) {
     return {
@@ -62,7 +63,7 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const resolvedParams = await params;
-  const productId = resolvedParams.id;
+  const productId = sanitizeSlugInput(resolvedParams.id, 64);
   const [liveProduct] = await fetchProductsWithInventory([productId]);
   const fallbackProduct = getProduct(productId);
   const product = liveProduct || fallbackProduct;

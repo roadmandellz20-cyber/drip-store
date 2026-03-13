@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { sanitizeIdInput, sanitizeSingleLineInput } from "@/lib/input";
 
 type Props = {
   initialOrderId: string;
@@ -12,7 +13,7 @@ const BUSINESS_WA_NUMBER = "2203340558";
 const BUSINESS_TEL = "+2203340558";
 
 function clampStr(value: string, max = 120) {
-  const v = (value || "").trim();
+  const v = sanitizeSingleLineInput(value, { maxLength: max });
   if (!v) return "";
   return v.length > max ? `${v.slice(0, max)}…` : v;
 }
@@ -45,14 +46,15 @@ export default function SuccessClient({ initialOrderId, initialOrderRef }: Props
   const [copied, setCopied] = useState(false);
   const [flash, setFlash] = useState(false);
 
-  const orderId = initialOrderId;
+  const orderId = sanitizeIdInput(initialOrderId, 120);
   const orderRef = useMemo(() => {
-    if (initialOrderRef) return initialOrderRef;
-    if (!initialOrderId) return "";
+    const sanitizedOrderRef = sanitizeIdInput(initialOrderRef, 40);
+    if (sanitizedOrderRef) return sanitizedOrderRef;
+    if (!orderId) return "";
 
-    const token = initialOrderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
+    const token = orderId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase();
     return `MGN-${token || "00000000"}`;
-  }, [initialOrderId, initialOrderRef]);
+  }, [initialOrderRef, orderId]);
 
   const message = useMemo(
     () => buildLuxuryMessage({ orderRef, orderId }),

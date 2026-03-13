@@ -8,6 +8,11 @@ import ProductImage from "@/components/ProductImage";
 import { trackEvent } from "@/lib/analytics";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import {
+  sanitizeEmailInput,
+  sanitizeMultilineInput,
+  sanitizeSingleLineInput,
+} from "@/lib/input";
+import {
   getCartInventoryState,
   cartTotal,
   clearCart,
@@ -48,6 +53,21 @@ const INITIAL_SHIPPING: ShippingForm = {
   country: "The Gambia",
   deliveryNote: "",
 };
+
+function sanitizeShippingForm(shipping: ShippingForm): ShippingForm {
+  return {
+    name: sanitizeSingleLineInput(shipping.name, { maxLength: 120 }),
+    email: sanitizeEmailInput(shipping.email),
+    phone: sanitizeSingleLineInput(shipping.phone, { maxLength: 40 }),
+    address1: sanitizeSingleLineInput(shipping.address1, { maxLength: 160 }),
+    address2: sanitizeSingleLineInput(shipping.address2, { maxLength: 160 }),
+    city: sanitizeSingleLineInput(shipping.city, { maxLength: 80 }),
+    region: sanitizeSingleLineInput(shipping.region, { maxLength: 80 }),
+    postalCode: sanitizeSingleLineInput(shipping.postalCode, { maxLength: 24 }),
+    country: sanitizeSingleLineInput(shipping.country, { maxLength: 80 }),
+    deliveryNote: sanitizeMultilineInput(shipping.deliveryNote, { maxLength: 500 }),
+  };
+}
 
 function triggerButtonGlitch(el: HTMLElement | null) {
   if (!el) return;
@@ -143,6 +163,8 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     const idempotencyKey = createIdempotencyKey();
+    const sanitizedShipping = sanitizeShippingForm(shipping);
+    setShipping(sanitizedShipping);
     let succeeded = false;
 
     try {
@@ -154,7 +176,7 @@ export default function CheckoutPage() {
         },
         body: JSON.stringify({
           idempotencyKey,
-          shipping,
+          shipping: sanitizedShipping,
           cart: displayItems.map((item) => ({
             productId: item.id,
             slug: item.product.sku,
@@ -334,7 +356,12 @@ export default function CheckoutPage() {
                 <span>NAME*</span>
                 <input
                   value={shipping.name}
-                  onChange={(e) => setShipping((v) => ({ ...v, name: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      name: sanitizeSingleLineInput(e.target.value, { maxLength: 120 }),
+                    }))
+                  }
                   placeholder="Name"
                   required
                 />
@@ -345,7 +372,12 @@ export default function CheckoutPage() {
                 <input
                   type="email"
                   value={shipping.email}
-                  onChange={(e) => setShipping((v) => ({ ...v, email: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      email: sanitizeEmailInput(e.target.value),
+                    }))
+                  }
                   placeholder="Email"
                   required
                 />
@@ -355,7 +387,12 @@ export default function CheckoutPage() {
                 <span>PHONE*</span>
                 <input
                   value={shipping.phone}
-                  onChange={(e) => setShipping((v) => ({ ...v, phone: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      phone: sanitizeSingleLineInput(e.target.value, { maxLength: 40 }),
+                    }))
+                  }
                   placeholder="Phone"
                   required
                 />
@@ -365,7 +402,12 @@ export default function CheckoutPage() {
                 <span>ADDRESS LINE 1*</span>
                 <input
                   value={shipping.address1}
-                  onChange={(e) => setShipping((v) => ({ ...v, address1: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      address1: sanitizeSingleLineInput(e.target.value, { maxLength: 160 }),
+                    }))
+                  }
                   placeholder="Address"
                   required
                 />
@@ -375,7 +417,12 @@ export default function CheckoutPage() {
                 <span>ADDRESS LINE 2</span>
                 <input
                   value={shipping.address2}
-                  onChange={(e) => setShipping((v) => ({ ...v, address2: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      address2: sanitizeSingleLineInput(e.target.value, { maxLength: 160 }),
+                    }))
+                  }
                   placeholder="Apartment, suite, etc"
                 />
               </label>
@@ -385,7 +432,12 @@ export default function CheckoutPage() {
                   <span>CITY*</span>
                   <input
                     value={shipping.city}
-                    onChange={(e) => setShipping((v) => ({ ...v, city: e.target.value }))}
+                    onChange={(e) =>
+                      setShipping((v) => ({
+                        ...v,
+                        city: sanitizeSingleLineInput(e.target.value, { maxLength: 80 }),
+                      }))
+                    }
                     placeholder="City"
                     required
                   />
@@ -395,7 +447,12 @@ export default function CheckoutPage() {
                   <span>REGION</span>
                   <input
                     value={shipping.region}
-                    onChange={(e) => setShipping((v) => ({ ...v, region: e.target.value }))}
+                    onChange={(e) =>
+                      setShipping((v) => ({
+                        ...v,
+                        region: sanitizeSingleLineInput(e.target.value, { maxLength: 80 }),
+                      }))
+                    }
                     placeholder="Region"
                   />
                 </label>
@@ -406,7 +463,12 @@ export default function CheckoutPage() {
                   <span>POSTAL CODE</span>
                   <input
                     value={shipping.postalCode}
-                    onChange={(e) => setShipping((v) => ({ ...v, postalCode: e.target.value }))}
+                    onChange={(e) =>
+                      setShipping((v) => ({
+                        ...v,
+                        postalCode: sanitizeSingleLineInput(e.target.value, { maxLength: 24 }),
+                      }))
+                    }
                     placeholder="Postal"
                   />
                 </label>
@@ -415,7 +477,12 @@ export default function CheckoutPage() {
                   <span>COUNTRY*</span>
                   <input
                     value={shipping.country}
-                    onChange={(e) => setShipping((v) => ({ ...v, country: e.target.value }))}
+                    onChange={(e) =>
+                      setShipping((v) => ({
+                        ...v,
+                        country: sanitizeSingleLineInput(e.target.value, { maxLength: 80 }),
+                      }))
+                    }
                     placeholder="Country"
                     required
                   />
@@ -426,7 +493,12 @@ export default function CheckoutPage() {
                 <span>DELIVERY NOTE</span>
                 <textarea
                   value={shipping.deliveryNote}
-                  onChange={(e) => setShipping((v) => ({ ...v, deliveryNote: e.target.value }))}
+                  onChange={(e) =>
+                    setShipping((v) => ({
+                      ...v,
+                      deliveryNote: sanitizeMultilineInput(e.target.value, { maxLength: 500 }),
+                    }))
+                  }
                   placeholder="Optional note"
                   rows={4}
                 />

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { sanitizeEmailInput } from "@/lib/input";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -14,7 +15,7 @@ export default function NewsletterSignup() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const normalized = email.trim().toLowerCase();
+    const normalized = sanitizeEmailInput(email);
     if (!isValidEmail(normalized)) {
       setStatus("error");
       setMessage("That email looks corrupted. Try again.");
@@ -66,7 +67,7 @@ export default function NewsletterSignup() {
           inputMode="email"
           autoComplete="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => setEmail(sanitizeEmailInput(event.target.value))}
           placeholder="Email"
           aria-label="Email address"
           disabled={status === "loading"}

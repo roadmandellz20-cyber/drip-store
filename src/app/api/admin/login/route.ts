@@ -8,6 +8,12 @@ import {
   isSameOriginRequest,
   validateAdminCredentials,
 } from "@/lib/admin-auth";
+import {
+  sanitizeEmailInput,
+  sanitizeIpInput,
+  sanitizePasswordInput,
+  sanitizeSingleLineInput,
+} from "@/lib/input";
 
 export const runtime = "nodejs";
 
@@ -23,13 +29,11 @@ type LoginAttemptState = {
 const loginAttemptLog = new Map<string, LoginAttemptState>();
 
 function asString(value: FormDataEntryValue | null) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function normalizeIp(ip: string) {
-  const raw = ip.trim();
-  if (!raw) return "unknown";
-  return raw.startsWith("::ffff:") ? raw.slice(7) : raw;
+  return sanitizeIpInput(ip);
 }
 
 function getClientIp(request: Request) {
@@ -123,9 +127,12 @@ export async function POST(request: Request) {
   }
 
   const formData = await request.formData();
-  const email = asString(formData.get("email"));
-  const password = asString(formData.get("password"));
-  const redirectPath = asString(formData.get("redirect"));
+  const email = sanitizeEmailInput(formData.get("email"));
+  const password = sanitizePasswordInput(formData.get("password"));
+  const redirectPath = sanitizeSingleLineInput(formData.get("redirect"), {
+    collapseWhitespace: false,
+    maxLength: 256,
+  });
   const loginUrl = new URL("/admin/login", request.url);
 
   if (!isSafeAdminRedirect(redirectPath)) {

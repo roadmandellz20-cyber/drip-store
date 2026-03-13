@@ -1,11 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifyAdminSession } from "@/lib/admin-auth";
+import { sanitizeSingleLineInput } from "@/lib/input";
 import { getSupabaseServerConfig, supabaseServer } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function isDebugRouteEnabled() {

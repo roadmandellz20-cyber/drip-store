@@ -6,6 +6,7 @@ import {
   isSafeAdminRedirect,
   verifyAdminSession,
 } from "@/lib/admin-auth";
+import { sanitizeSingleLineInput } from "@/lib/input";
 
 export const metadata: Metadata = {
   title: "Admin Login",
@@ -21,8 +22,12 @@ export default async function AdminLoginPage({
   searchParams?: Promise<{ error?: string; redirect?: string }>;
 }) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const redirectPath = isSafeAdminRedirect(resolvedSearchParams.redirect)
-    ? resolvedSearchParams.redirect || "/admin/orders"
+  const redirectCandidate = sanitizeSingleLineInput(resolvedSearchParams.redirect, {
+    collapseWhitespace: false,
+    maxLength: 256,
+  });
+  const redirectPath = isSafeAdminRedirect(redirectCandidate)
+    ? redirectCandidate || "/admin/orders"
     : "/admin/orders";
   const sessionCookie = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
 
@@ -30,7 +35,7 @@ export default async function AdminLoginPage({
     redirect(redirectPath);
   }
 
-  const hasError = resolvedSearchParams.error === "invalid";
+  const hasError = sanitizeSingleLineInput(resolvedSearchParams.error, { maxLength: 32 }) === "invalid";
 
   return (
     <main className="page page--narrow">

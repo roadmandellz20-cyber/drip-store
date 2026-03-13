@@ -1,3 +1,5 @@
+import { sanitizeIdInput, sanitizeSingleLineInput } from "@/lib/input";
+
 export type OrderSuccessSummary = {
   orderId: string;
   orderRef: string;
@@ -9,7 +11,7 @@ export type OrderSuccessSummary = {
 const KEY = "mugen_last_order_summary_v1";
 
 function asString(value: unknown) {
-  return typeof value === "string" ? value.trim() : "";
+  return sanitizeSingleLineInput(value);
 }
 
 function asNumber(value: unknown) {
@@ -29,8 +31,8 @@ export function createOrderSuccessSummary(params: {
   itemCount: number;
 }): OrderSuccessSummary {
   return {
-    orderId: params.orderId,
-    orderRef: params.orderRef,
+    orderId: sanitizeIdInput(params.orderId, 120),
+    orderRef: sanitizeIdInput(params.orderRef, 40),
     currency: params.currency,
     total: params.total,
     itemCount: Math.max(0, Math.floor(params.itemCount)),
@@ -60,8 +62,8 @@ export function parseOrderSuccessSummary(raw: string) {
     if (!isRecord(parsed)) return null;
 
     const summary: OrderSuccessSummary = {
-      orderId: asString(parsed.orderId),
-      orderRef: asString(parsed.orderRef),
+      orderId: sanitizeIdInput(parsed.orderId, 120),
+      orderRef: sanitizeIdInput(parsed.orderRef, 40),
       currency: asString(parsed.currency) || "GMD",
       total: asNumber(parsed.total),
       itemCount: Math.max(0, Math.floor(asNumber(parsed.itemCount))),

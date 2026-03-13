@@ -1,6 +1,7 @@
+import { sanitizeIdInput, sanitizeSingleLineInput, sanitizeSlugInput } from "@/lib/input";
 import type { Product } from "./products";
 import { trackEvent } from "./analytics";
-import { getProduct, isProductSoldOut, LIMITED_STOCK_QTY } from "./products";
+import { getProductBySku, isProductSoldOut, LIMITED_STOCK_QTY } from "./products";
 
 export type CartItem = {
   id: string;
@@ -71,13 +72,9 @@ function resolveCatalogProduct(item: Record<string, unknown>) {
   if (!isRecord(product)) return null;
 
   const sku =
-    typeof product.sku === "string"
-      ? product.sku
-      : typeof item.id === "string"
-        ? item.id
-        : "";
+    sanitizeSlugInput(product.sku, 64) || sanitizeSlugInput(item.id, 64);
 
-  return sku ? getProduct(String(sku)) : null;
+  return sku ? getProductBySku(sku) : null;
 }
 
 function normalizeCartItem(item: Record<string, unknown>): CartItem | null {
@@ -87,25 +84,20 @@ function normalizeCartItem(item: Record<string, unknown>): CartItem | null {
   const catalogProduct = resolveCatalogProduct(item);
 
   const imageUrl =
-    typeof product.imageUrl === "string"
-      ? product.imageUrl
-      : typeof product.image === "string"
-        ? product.image
-        : catalogProduct?.imageUrl || "";
+    sanitizeSingleLineInput(catalogProduct?.imageUrl || product.imageUrl || product.image, {
+      collapseWhitespace: false,
+      maxLength: 2048,
+    });
   const imageFallbackUrl =
-    typeof product.imageFallbackUrl === "string"
-      ? product.imageFallbackUrl
-      : catalogProduct?.imageFallbackUrl || imageUrl;
-  const sku =
-    typeof product.sku === "string"
-      ? product.sku
-      : catalogProduct?.sku || (typeof item.id === "string" ? item.id : "");
-  const id =
-    typeof item.id === "string"
-      ? item.id
-      : typeof product.id === "string"
-        ? product.id
-        : catalogProduct?.id || "";
+    sanitizeSingleLineInput(catalogProduct?.imageFallbackUrl || product.imageFallbackUrl || imageUrl, {
+      collapseWhitespace: false,
+      maxLength: 2048,
+    });
+  const sku = catalogProduct?.sku || sanitizeSlugInput(product.sku, 64) || sanitizeSlugInput(item.id, 64);
+  const id = catalogProduct?.id || sanitizeIdInput(item.id, 120) || sanitizeIdInput(product.id, 120) || "";
+  const name = catalogProduct?.name || sanitizeSingleLineInput(product.name, { maxLength: 160 }) || "";
+  const price =
+    typeof product.price === "number" ? product.price : typeof catalogProduct?.price === "number" ? catalogProduct.price : null;
   const isLimited =
     typeof product.isLimited === "boolean"
       ? product.isLimited
@@ -130,8 +122,8 @@ function normalizeCartItem(item: Record<string, unknown>): CartItem | null {
     !id ||
     !sku ||
     !imageUrl ||
-    typeof product.name !== "string" ||
-    typeof product.price !== "number" ||
+    !name ||
+    typeof price !== "number" ||
     (item.size !== "S" && item.size !== "M" && item.size !== "L" && item.size !== "XL")
   ) {
     return null;
@@ -142,9 +134,9 @@ function normalizeCartItem(item: Record<string, unknown>): CartItem | null {
     qty: clampQty(item.qty),
     size: item.size,
     product: {
-      id: typeof product.id === "string" ? product.id : catalogProduct?.id || id,
-      name: product.name,
-      price: product.price,
+      id: catalogProduct?.id || sanitizeIdInput(product.id, 120) || id,
+      name,
+      price,
       imageUrl,
       imageFallbackUrl,
       sku,
