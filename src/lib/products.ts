@@ -66,8 +66,8 @@ function buildProductImages(sku: string) {
   return {
     imageUrl: getCanonicalProductImageUrl(sku),
     imageFallbackUrl: fallbackUrl,
-    lookImageUrl: getCanonicalProductImageUrl(sku),
-    lookImageFallbackUrl: fallbackUrl,
+    lookImageUrl: null as unknown as string,
+    lookImageFallbackUrl: null as unknown as string,
   };
 }
 
