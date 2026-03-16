@@ -26,6 +26,7 @@ export default function ProductDetailClient({
   const product = liveProduct || initialProduct;
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
+  const detailBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
 
@@ -68,7 +69,7 @@ export default function ProductDetailClient({
         <div className="detail__info">
           <div className="detail__sku">{product.sku}</div>
           <h1 className="detail__title">{product.name}</h1>
-          <div className="detail__line">{product.brandLine}</div>
+          <div className="detail__line">{detailBrandLine}</div>
 
           <div className="detail__price">GMD {product.price.toLocaleString()}</div>
           {product.isLimited ? (
