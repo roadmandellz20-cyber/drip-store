@@ -1,16 +1,267 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import ProductGrid from "@/components/ProductGrid";
+import { useRouter } from "next/navigation";
 import ProductImage from "@/components/ProductImage";
-import LaunchCountdown from "@/components/LaunchCountdown";
 import WaitlistModal from "@/components/WaitlistModal";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
 import { trackEvent } from "@/lib/analytics";
 import { addToCart } from "@/lib/cart";
+import { getLaunchDate } from "@/lib/launch";
+import {
+  hasDistinctLookImage,
+  warmProductImage,
+  warnOnDuplicateLookImage,
+} from "@/lib/product-images";
 import { getProductUiState, type Product } from "@/lib/products";
+
+function pad2(n: number) {
+  return String(Math.max(0, Math.floor(n))).padStart(2, "0");
+}
+
+function triggerButtonGlitch(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("btn-glitch");
+  void el.offsetWidth;
+  el.classList.add("btn-glitch");
+  window.setTimeout(() => el.classList.remove("btn-glitch"), 220);
+}
+
+function triggerCardPulse(el: HTMLElement | null) {
+  if (!el) return;
+  el.classList.remove("p-card--pulse");
+  void el.offsetWidth;
+  el.classList.add("p-card--pulse");
+  window.setTimeout(() => el.classList.remove("p-card--pulse"), 140);
+}
+
+function DetailCountdownBlocks() {
+  const [now, setNow] = useState(() => Date.now());
+  const launchDate = useMemo(() => getLaunchDate(new Date(now)), [now]);
+
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+
+    const t = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(t);
+  }, []);
+
+  if (!launchDate) return null;
+
+  const diff = launchDate.getTime() - now;
+  const isLive = diff <= 0;
+  if (isLive) {
+    return (
+      <div className="launchInline">
+        <span className="launchInline__live">DROP IS LIVE</span>
+      </div>
+    );
+  }
+
+  const totalSeconds = Math.floor(Math.max(0, diff) / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return (
+    <div className="launchInline">
+      <div className="launchTimer launchTimer--inline" aria-label="Launch countdown">
+        <div className="launchTimer__unit">
+          <div className="launchTimer__num" suppressHydrationWarning>
+            {days}
+          </div>
+          <div className="launchTimer__label">DAYS</div>
+        </div>
+        <div className="launchTimer__unit">
+          <div className="launchTimer__num" suppressHydrationWarning>
+            {pad2(hours)}
+          </div>
+          <div className="launchTimer__label">HRS</div>
+        </div>
+        <div className="launchTimer__unit">
+          <div className="launchTimer__num" suppressHydrationWarning>
+            {pad2(mins)}
+          </div>
+          <div className="launchTimer__label">MIN</div>
+        </div>
+        <div className="launchTimer__unit">
+          <div className="launchTimer__num" suppressHydrationWarning>
+            {pad2(secs)}
+          </div>
+          <div className="launchTimer__label">SEC</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRelatedProductCard({
+  product,
+  launchLive,
+}: {
+  product: Product;
+  launchLive: boolean;
+}) {
+  const router = useRouter();
+  const [hover, setHover] = useState(false);
+  const [leadLoaded, setLeadLoaded] = useState(false);
+  const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
+  const addDisabled = !launchLive || soldOutUi;
+  const showLaunchNote = product.isLimited && !launchLive;
+  const hoverSwapEnabled = hasDistinctLookImage(product);
+  const cardBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
+  const cardRef = useRef<HTMLElement | null>(null);
+  const warmedRef = useRef(false);
+
+  const tiltClass = useMemo(() => {
+    const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    const offset = (seed % 7) - 3;
+    if (offset < 0) return `p-card--tilt-n${Math.abs(offset)}`;
+    if (offset > 0) return `p-card--tilt-p${offset}`;
+    return "p-card--tilt-0";
+  }, [product.id]);
+
+  useEffect(() => {
+    if (!hoverSwapEnabled) {
+      warnOnDuplicateLookImage(product);
+    }
+  }, [hoverSwapEnabled, product]);
+
+  const warmDetailAssets = () => {
+    if (warmedRef.current) return;
+    warmedRef.current = true;
+
+    router.prefetch(`/product/${product.id}`);
+    warmProductImage(product.imageFallbackUrl || product.imageUrl, 1600);
+    if (hoverSwapEnabled) {
+      warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
+    }
+  };
+
+  const onCop = () => {
+    if (addDisabled) return;
+    const result = addToCart(product, "M", 1);
+    if (result.status === "added") {
+      window.dispatchEvent(new CustomEvent("mugen_toast", { detail: "Added to cart." }));
+    }
+    triggerCardPulse(cardRef.current);
+  };
+
+  return (
+    <article
+      ref={cardRef}
+      className={`p-card ${tiltClass} ${product.isLimited ? "p-card--limited" : "p-card--available"} ${soldOutUi ? "p-card--soldout" : ""}`}
+      onMouseEnter={() => {
+        setHover(hoverSwapEnabled);
+        warmDetailAssets();
+      }}
+      onMouseLeave={() => setHover(false)}
+    >
+      <div className="p-card__frame">
+        <div className="p-card__status">
+          <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
+        </div>
+
+        <Link
+          className={`p-card__imgWrap ${leadLoaded ? "p-card__imgWrap--loaded" : ""} ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
+          href={`/product/${product.id}`}
+          aria-label={product.name}
+          onTouchStart={warmDetailAssets}
+          onFocus={warmDetailAssets}
+        >
+          <ProductImage
+            className={`p-card__img ${hover ? "is-hidden" : ""}`}
+            src={product.imageUrl}
+            fallbackSrc={product.imageFallbackUrl}
+            alt={product.name}
+            variant="grid"
+            fill
+            loading="lazy"
+            sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
+            onLoadStateChange={setLeadLoaded}
+          />
+          {hoverSwapEnabled ? (
+            <ProductImage
+              className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
+              src={product.lookImageUrl}
+              fallbackSrc={product.lookImageFallbackUrl}
+              alt={`${product.name} lookbook`}
+              variant="grid"
+              fill
+              loading="lazy"
+              sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
+            />
+          ) : null}
+
+          <div className="p-card__camglitch" aria-hidden="true" />
+        </Link>
+
+        <div className="p-card__meta">
+          <div className="p-card__sku">{product.sku}</div>
+          <h3 className="p-card__title">{product.name.toUpperCase()}</h3>
+          {product.isLimited ? (
+            <div className={`p-card__scarcity ${soldOutUi ? "p-card__scarcity--soldout" : ""}`}>
+              <div className="p-card__scarcityHead">
+                <span className="chip chip--limited">LIMITED ARCHIVE</span>
+                {launchLive ? <div className="p-card__scarcityLabel">LIMITED STOCK</div> : null}
+              </div>
+              {launchLive ? (
+                <>
+                  {scarcityText ? (
+                    <div className={`p-card__stock ${soldOutUi ? "p-card__stock--soldout" : ""}`}>
+                      {scarcityText}
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <div className="p-card__stock">{scarcityText}</div>
+                  {showLaunchNote ? (
+                    <div className="p-card__statusNote">Opens April 1 (00:00)</div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          ) : null}
+          <div className="p-card__brandline">{cardBrandLine}</div>
+
+          <div className="p-card__row">
+            <button
+              className={`btn ${product.isLimited ? "btn--primary" : "btn--ghost"}`}
+              onClick={(e) => {
+                triggerButtonGlitch(e.currentTarget);
+                onCop();
+              }}
+              type="button"
+              disabled={addDisabled}
+            >
+              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
+            </button>
+
+            <div className="p-card__price">GMD {product.price.toLocaleString()}</div>
+
+            <Link
+              className="p-card__view"
+              href={`/product/${product.id}`}
+              onClick={(e) => triggerButtonGlitch(e.currentTarget)}
+              onTouchStart={warmDetailAssets}
+              onFocus={warmDetailAssets}
+            >
+              view →
+            </Link>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
 
 export default function ProductDetailClient({
   initialProduct,
@@ -23,6 +274,7 @@ export default function ProductDetailClient({
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const launchLive = useLaunchLive();
   const [liveProduct] = useLiveProducts([initialProduct]);
+  const liveRelatedProducts = useLiveProducts(relatedProducts);
   const product = liveProduct || initialProduct;
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
@@ -106,7 +358,7 @@ export default function ProductDetailClient({
           </div>
 
           <div className="detail__actions">
-            {!launchLive ? <LaunchCountdown variant="inline" /> : null}
+            {!launchLive ? <DetailCountdownBlocks /> : null}
 
             <div className="detail__buttonRow">
               {!launchLive ? (
@@ -167,10 +419,18 @@ export default function ProductDetailClient({
         </div>
       </div>
 
-      {relatedProducts.length ? (
+      {liveRelatedProducts.length ? (
         <section className="detail__related">
           <div className="detail__label">You may also like</div>
-          <ProductGrid products={relatedProducts} priorityCount={0} />
+          <div className="grid">
+            {liveRelatedProducts.map((relatedProduct) => (
+              <DetailRelatedProductCard
+                key={relatedProduct.id}
+                product={relatedProduct}
+                launchLive={launchLive}
+              />
+            ))}
+          </div>
         </section>
       ) : null}
 
