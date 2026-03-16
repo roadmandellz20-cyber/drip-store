@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
-import { warmProductImage } from "@/lib/product-images";
+import {
+  hasDistinctLookImage,
+  warmProductImage,
+  warnOnDuplicateLookImage,
+} from "@/lib/product-images";
 import { getProductUiState, type Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
@@ -42,6 +46,8 @@ export default function ProductCard({
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
   const showLaunchNote = product.isLimited && !launchLive;
+  const hoverSwapEnabled = hasDistinctLookImage(product);
+  const cardBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
 
   const tiltClass = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -60,13 +66,21 @@ export default function ProductCard({
     triggerCardPulse(cardRef.current);
   };
 
+  useEffect(() => {
+    if (!hoverSwapEnabled) {
+      warnOnDuplicateLookImage(product);
+    }
+  }, [hoverSwapEnabled, product]);
+
   const warmDetailAssets = () => {
     if (warmedRef.current) return;
     warmedRef.current = true;
 
     router.prefetch(`/product/${product.id}`);
     warmProductImage(product.imageFallbackUrl || product.imageUrl, 1600);
-    warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
+    if (hoverSwapEnabled) {
+      warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
+    }
   };
 
   return (
@@ -74,7 +88,7 @@ export default function ProductCard({
       ref={cardRef}
       className={`p-card ${tiltClass} ${product.isLimited ? "p-card--limited" : "p-card--available"} ${soldOutUi ? "p-card--soldout" : ""}`}
       onMouseEnter={() => {
-        setHover(true);
+        setHover(hoverSwapEnabled);
         warmDetailAssets();
       }}
       onMouseLeave={() => setHover(false)}
@@ -103,16 +117,18 @@ export default function ProductCard({
             sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
             onLoadStateChange={setLeadLoaded}
           />
-          <ProductImage
-            className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
-            src={product.lookImageUrl}
-            fallbackSrc={product.lookImageFallbackUrl}
-            alt={`${product.name} lookbook`}
-            variant="grid"
-            fill
-            loading="lazy"
-            sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
-          />
+          {hoverSwapEnabled ? (
+            <ProductImage
+              className={`p-card__img p-card__img--look ${hover ? "is-visible" : ""}`}
+              src={product.lookImageUrl}
+              fallbackSrc={product.lookImageFallbackUrl}
+              alt={`${product.name} lookbook`}
+              variant="grid"
+              fill
+              loading="lazy"
+              sizes="(max-width: 620px) 100vw, (max-width: 980px) 50vw, 33vw"
+            />
+          ) : null}
 
           <div className="p-card__camglitch" aria-hidden="true" />
         </Link>
@@ -144,7 +160,7 @@ export default function ProductCard({
               )}
             </div>
           ) : null}
-          <div className="p-card__brandline">{product.brandLine}</div>
+          <div className="p-card__brandline">{cardBrandLine}</div>
 
           <div className="p-card__row">
             <button

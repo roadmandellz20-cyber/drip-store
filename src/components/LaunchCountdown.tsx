@@ -7,6 +7,47 @@ function pad2(n: number) {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
 }
 
+function CountdownUnits({
+  days,
+  hours,
+  mins,
+  secs,
+}: {
+  days: number;
+  hours: number;
+  mins: number;
+  secs: number;
+}) {
+  return (
+    <>
+      <div className="launchTimer__unit">
+        <div className="launchTimer__num" suppressHydrationWarning>
+          {days}
+        </div>
+        <div className="launchTimer__label">DAYS</div>
+      </div>
+      <div className="launchTimer__unit">
+        <div className="launchTimer__num" suppressHydrationWarning>
+          {pad2(hours)}
+        </div>
+        <div className="launchTimer__label">HRS</div>
+      </div>
+      <div className="launchTimer__unit">
+        <div className="launchTimer__num" suppressHydrationWarning>
+          {pad2(mins)}
+        </div>
+        <div className="launchTimer__label">MIN</div>
+      </div>
+      <div className="launchTimer__unit">
+        <div className="launchTimer__num" suppressHydrationWarning>
+          {pad2(secs)}
+        </div>
+        <div className="launchTimer__label">SEC</div>
+      </div>
+    </>
+  );
+}
+
 export default function LaunchCountdown({
   variant = "banner",
 }: {
@@ -36,8 +77,6 @@ export default function LaunchCountdown({
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const mins = Math.floor((totalSeconds % 3600) / 60);
   const secs = totalSeconds % 60;
-  const inlineTimeText = `${days}D ${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
-  const inlineDisplayText = `DROP OPENS IN ${inlineTimeText}`;
 
   if (variant === "inline") {
     return (
@@ -45,9 +84,9 @@ export default function LaunchCountdown({
         {isLive ? (
           <span className="launchInline__live">DROP IS LIVE</span>
         ) : (
-          <span className="launchInline__time" suppressHydrationWarning>
-            {inlineDisplayText}
-          </span>
+          <div className="launchTimer launchTimer--inline" aria-label="Launch countdown">
+            <CountdownUnits days={days} hours={hours} mins={mins} secs={secs} />
+          </div>
         )}
       </div>
     );
@@ -72,30 +111,7 @@ export default function LaunchCountdown({
           <div className="launchBanner__pill">ENTER THE MUGEN</div>
         ) : (
           <div className="launchTimer" aria-label="Launch countdown">
-            <div className="launchTimer__unit">
-              <div className="launchTimer__num" suppressHydrationWarning>
-                {days}
-              </div>
-              <div className="launchTimer__label">DAYS</div>
-            </div>
-            <div className="launchTimer__unit">
-              <div className="launchTimer__num" suppressHydrationWarning>
-                {pad2(hours)}
-              </div>
-              <div className="launchTimer__label">HRS</div>
-            </div>
-            <div className="launchTimer__unit">
-              <div className="launchTimer__num" suppressHydrationWarning>
-                {pad2(mins)}
-              </div>
-              <div className="launchTimer__label">MIN</div>
-            </div>
-            <div className="launchTimer__unit">
-              <div className="launchTimer__num" suppressHydrationWarning>
-                {pad2(secs)}
-              </div>
-              <div className="launchTimer__label">SEC</div>
-            </div>
+            <CountdownUnits days={days} hours={hours} mins={mins} secs={secs} />
           </div>
         )}
       </div>

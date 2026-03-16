@@ -1,11 +1,21 @@
 const PRODUCT_IMAGE_PATH_RE = /^(\/archive\/assets\/products\/[^/.]+?)(?:-(480|900))?\.jpg$/i;
+const warnedDuplicateLookImages = new Set<string>();
+
+type ProductImageAuditTarget = {
+  id?: string;
+  sku?: string;
+  imageUrl: string;
+  imageFallbackUrl?: string;
+  lookImageUrl: string;
+  lookImageFallbackUrl?: string;
+};
 
 export function isLocalProductAsset(src?: string) {
   return typeof src === "string" && PRODUCT_IMAGE_PATH_RE.test(src);
 }
 
-export function getPreferredProductImageSrc(src: string, fallbackSrc?: string) {
-  if (isLocalProductAsset(fallbackSrc)) {
+export function getPreferredProductImageSrc(src: string, fallbackSrc?: string): string {
+  if (typeof fallbackSrc === "string" && isLocalProductAsset(fallbackSrc)) {
     return fallbackSrc;
   }
 
@@ -42,6 +52,62 @@ export function getProductDisplaySrc(
   }
 
   return src;
+}
+
+function normalizeProductSrc(src?: string) {
+  return typeof src === "string" ? src.trim() : "";
+}
+
+function getComparableProductImageSrc(
+  src: string | undefined,
+  fallbackSrc: string | undefined,
+  variant: "grid" | "detail" | "thumb"
+) {
+  const normalizedSrc = normalizeProductSrc(src);
+  const normalizedFallbackSrc = normalizeProductSrc(fallbackSrc);
+  const candidateSrc = normalizedSrc || normalizedFallbackSrc;
+
+  if (!candidateSrc) return "";
+
+  return getProductDisplaySrc(
+    getPreferredProductImageSrc(candidateSrc, normalizedFallbackSrc || undefined),
+    variant
+  );
+}
+
+export function hasDistinctLookImage(
+  product: ProductImageAuditTarget,
+  variant: "grid" | "detail" | "thumb" = "grid"
+) {
+  const primarySrc = getComparableProductImageSrc(product.imageUrl, product.imageFallbackUrl, variant);
+  const lookSrc = getComparableProductImageSrc(product.lookImageUrl, product.lookImageFallbackUrl, variant);
+
+  return Boolean(primarySrc) && Boolean(lookSrc) && primarySrc !== lookSrc;
+}
+
+export function warnOnDuplicateLookImage(
+  product: ProductImageAuditTarget,
+  variant: "grid" | "detail" | "thumb" = "grid"
+) {
+  if (typeof window === "undefined") return;
+
+  const primarySrc = getComparableProductImageSrc(product.imageUrl, product.imageFallbackUrl, variant);
+  const lookSrc = getComparableProductImageSrc(product.lookImageUrl, product.lookImageFallbackUrl, variant);
+
+  if (!primarySrc || !lookSrc || primarySrc !== lookSrc) return;
+
+  const productKey = product.sku || product.id || lookSrc;
+  if (warnedDuplicateLookImages.has(productKey)) return;
+  warnedDuplicateLookImages.add(productKey);
+
+  console.warn(`[MUGEN DISTRICT] Hover swap disabled for ${productKey}: look image matches primary image.`, {
+    imageUrl: product.imageUrl,
+    imageFallbackUrl: product.imageFallbackUrl,
+    lookImageUrl: product.lookImageUrl,
+    lookImageFallbackUrl: product.lookImageFallbackUrl,
+    resolvedPrimarySrc: primarySrc,
+    resolvedLookSrc: lookSrc,
+  });
 }
 
 export function getProductImageBlurDataUrl() {

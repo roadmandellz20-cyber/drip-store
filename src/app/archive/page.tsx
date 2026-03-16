@@ -44,7 +44,7 @@ export default async function ArchivePage() {
         <div className="hero__torn" aria-hidden="true" />
 
         <div className="hero__inner">
-          <div className="hero__kicker">URBAN TOKYO CHAOS</div>
+          <div className="hero__kicker">ARCHIVE DROP 001</div>
 
           <h1 className="hero__title hero-title mugen-header" data-text="MUGEN DISTRICT">
             MUGEN <span>DISTRICT</span>
@@ -77,8 +77,8 @@ export default async function ArchivePage() {
 
       <section className="section">
         <div className="section__head">
-          <h2 className="section__title">MUGEN PRODUCT GRID</h2>
-          <p className="section__note">Art pieces — not just shirts. Hover to swap to lookbook.</p>
+          <h2 className="section__title">THE ARCHIVE</h2>
+          <p className="section__note">Drop 001 — Five pieces. Three limited. No restocks.</p>
         </div>
 
         <ProductGrid products={products} />
