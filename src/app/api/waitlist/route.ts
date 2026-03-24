@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import {
   sanitizeEmailInput,
-  sanitizeIpInput,
   sanitizeSingleLineInput,
   sanitizeSlugInput,
 } from "@/lib/input";
+import {
+  consumeRequestRateLimit,
+  rateLimitJsonResponse,
+} from "@/lib/request-rate-limit";
 
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PRODUCT_SKU_RE = /^[a-z0-9-]{1,64}$/;
 const ALLOWED_SOURCES = new Set(["store", "product"]);
-const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 const RATE_LIMIT_MAX_REQUESTS = 5;
-
-type IpRateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-
-const waitlistIpLog = new Map<string, IpRateLimitEntry>();
+const WAITLIST_RATE_LIMIT = {
+  scope: "waitlist-signup",
+  windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+  maxRequests: RATE_LIMIT_MAX_REQUESTS,
+  blockSeconds: 5 * 60,
+} as const;
 
 function asString(value: unknown) {
   return sanitizeSingleLineInput(value);
@@ -30,41 +32,6 @@ async function loadSupabaseAdmin() {
   return mod.supabaseAdmin;
 }
 
-function normalizeIp(ip: string) {
-  return sanitizeIpInput(ip);
-}
-
-function getClientIp(request: Request) {
-  const forwardedFor = asString(request.headers.get("x-forwarded-for"));
-  if (forwardedFor) {
-    return normalizeIp(forwardedFor.split(",")[0] || "");
-  }
-
-  const realIp = asString(request.headers.get("x-real-ip"));
-  return normalizeIp(realIp || "unknown");
-}
-
-function isRateLimited(ip: string, now = Date.now()) {
-  waitlistIpLog.forEach((entry, key) => {
-    if (entry.resetAt <= now) {
-      waitlistIpLog.delete(key);
-    }
-  });
-
-  const entry = waitlistIpLog.get(ip);
-  if (!entry) {
-    waitlistIpLog.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return true;
-  }
-
-  entry.count += 1;
-  return false;
-}
-
 function isValidContact(contact: string) {
   return contact.length > 3 && contact.length <= 254 && EMAIL_RE.test(contact);
 }
@@ -72,6 +39,15 @@ function isValidContact(contact: string) {
 function isValidProductSku(productSku: string) {
   if (!productSku) return true;
   return PRODUCT_SKU_RE.test(productSku);
+}
+
+function isUniqueViolation(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      asString((error as { code?: unknown }).code) === "23505"
+  );
 }
 
 export async function POST(request: Request) {
@@ -101,16 +77,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Invalid product SKU." }, { status: 400 });
     }
 
-    const ip = getClientIp(request);
-    if (isRateLimited(ip)) {
-      return NextResponse.json(
-        { ok: false, error: "Hold for a moment before hitting the archive again." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)),
-          },
-        }
+    const rateLimit = await consumeRequestRateLimit(WAITLIST_RATE_LIMIT, request, {
+      keyParts: [source],
+    });
+    if (!rateLimit.allowed) {
+      return rateLimitJsonResponse(
+        "Hold for a moment before hitting the archive again.",
+        rateLimit.retryAfterSeconds
       );
     }
 
@@ -123,6 +96,9 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      if (isUniqueViolation(error)) {
+        return NextResponse.json({ ok: true });
+      }
       console.error("[waitlist] insert failed", error);
       return NextResponse.json({ ok: false, error: "Waitlist signup failed." }, { status: 500 });
     }

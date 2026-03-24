@@ -9,89 +9,25 @@ import {
   validateAdminCredentials,
 } from "@/lib/admin-auth";
 import {
+  clearRequestRateLimit,
+  consumeRequestRateLimit,
+} from "@/lib/request-rate-limit";
+import {
   sanitizeEmailInput,
-  sanitizeIpInput,
   sanitizePasswordInput,
   sanitizeSingleLineInput,
 } from "@/lib/input";
 
 export const runtime = "nodejs";
 
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_WINDOW_SECONDS = 15 * 60;
 const LOGIN_MAX_ATTEMPTS = 10;
-
-type LoginAttemptState = {
-  count: number;
-  resetAt: number;
-  blockedUntil: number;
-};
-
-const loginAttemptLog = new Map<string, LoginAttemptState>();
-
-function asString(value: FormDataEntryValue | null) {
-  return sanitizeSingleLineInput(value);
-}
-
-function normalizeIp(ip: string) {
-  return sanitizeIpInput(ip);
-}
-
-function getClientIp(request: Request) {
-  const forwardedFor = asString(request.headers.get("x-forwarded-for"));
-  if (forwardedFor) {
-    return normalizeIp(forwardedFor.split(",")[0] || "");
-  }
-
-  const realIp = asString(request.headers.get("x-real-ip"));
-  if (realIp) {
-    return normalizeIp(realIp);
-  }
-
-  return "unknown";
-}
-
-function getAttemptState(ip: string, now = Date.now()) {
-  const state = loginAttemptLog.get(ip);
-  if (!state) {
-    return null;
-  }
-
-  if (state.resetAt <= now && state.blockedUntil <= now) {
-    loginAttemptLog.delete(ip);
-    return null;
-  }
-
-  if (state.resetAt <= now) {
-    state.count = 0;
-    state.resetAt = now + LOGIN_WINDOW_MS;
-  }
-
-  return state;
-}
-
-function getRetryAfterSeconds(state: LoginAttemptState, now = Date.now()) {
-  if (state.blockedUntil <= now) return 0;
-  return Math.max(1, Math.ceil((state.blockedUntil - now) / 1000));
-}
-
-function registerFailedAttempt(ip: string, now = Date.now()) {
-  const state =
-    getAttemptState(ip, now) ||
-    ({ count: 0, resetAt: now + LOGIN_WINDOW_MS, blockedUntil: 0 } satisfies LoginAttemptState);
-
-  state.count += 1;
-
-  if (state.count >= LOGIN_MAX_ATTEMPTS) {
-    state.blockedUntil = now + LOGIN_WINDOW_MS;
-  }
-
-  loginAttemptLog.set(ip, state);
-  return getRetryAfterSeconds(state, now);
-}
-
-function clearFailedAttempts(ip: string) {
-  loginAttemptLog.delete(ip);
-}
+const LOGIN_RATE_LIMIT = {
+  scope: "admin-login",
+  windowSeconds: LOGIN_WINDOW_SECONDS,
+  maxRequests: LOGIN_MAX_ATTEMPTS,
+  blockSeconds: LOGIN_WINDOW_SECONDS,
+} as const;
 
 function tooManyAttemptsResponse(retryAfterSeconds: number) {
   return NextResponse.json(
@@ -118,12 +54,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const ip = getClientIp(request);
-  const now = Date.now();
-  const state = getAttemptState(ip, now);
-  const blockedSeconds = state ? getRetryAfterSeconds(state, now) : 0;
-  if (blockedSeconds > 0) {
-    return tooManyAttemptsResponse(blockedSeconds);
+  const preflightRateLimit = await consumeRequestRateLimit(LOGIN_RATE_LIMIT, request, {
+    increment: false,
+  });
+  if (!preflightRateLimit.allowed) {
+    return tooManyAttemptsResponse(preflightRateLimit.retryAfterSeconds);
   }
 
   const formData = await request.formData();
@@ -142,16 +77,16 @@ export async function POST(request: Request) {
   }
 
   if (!(await validateAdminCredentials(email, password))) {
-    const retryAfter = registerFailedAttempt(ip, now);
-    if (retryAfter > 0) {
-      return tooManyAttemptsResponse(retryAfter);
+    const failedAttempt = await consumeRequestRateLimit(LOGIN_RATE_LIMIT, request);
+    if (!failedAttempt.allowed) {
+      return tooManyAttemptsResponse(failedAttempt.retryAfterSeconds);
     }
 
     loginUrl.searchParams.set("error", "invalid");
     return NextResponse.redirect(loginUrl, { status: 303 });
   }
 
-  clearFailedAttempts(ip);
+  await clearRequestRateLimit(LOGIN_RATE_LIMIT, request);
 
   const response = NextResponse.redirect(
     new URL(isSafeAdminRedirect(redirectPath) ? redirectPath : "/admin/orders", request.url),

@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { ResendRequestError, sendEmail } from "@/lib/email/send";
 import { sanitizeEmailInput, sanitizeSingleLineInput } from "@/lib/input";
+import {
+  consumeRequestRateLimit,
+  rateLimitJsonResponse,
+} from "@/lib/request-rate-limit";
 import { getSiteUrl } from "@/lib/site";
 
 export const runtime = "nodejs";
+const NEWSLETTER_RATE_LIMIT = {
+  scope: "newsletter-signup",
+  windowSeconds: 10 * 60,
+  maxRequests: 5,
+  blockSeconds: 15 * 60,
+} as const;
 
 function asString(value: unknown) {
   return sanitizeSingleLineInput(value);
@@ -49,6 +59,15 @@ async function loadSupabaseAdmin() {
   return mod.supabaseAdmin;
 }
 
+function isUniqueViolation(error: unknown) {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      asString((error as { code?: unknown }).code) === "23505"
+  );
+}
+
 async function persistNewsletterSignup(email: string) {
   const supabaseAdmin = await loadSupabaseAdmin();
   const { error } = await supabaseAdmin.from("waitlist").insert({
@@ -58,8 +77,13 @@ async function persistNewsletterSignup(email: string) {
   });
 
   if (error) {
+    if (isUniqueViolation(error)) {
+      return "duplicate" as const;
+    }
     throw new Error("waitlist_insert_failed");
   }
+
+  return "inserted" as const;
 }
 
 function logEmailFailure(kind: "admin" | "customer", error: unknown) {
@@ -107,6 +131,14 @@ function newsletterCustomerHtml(email: string) {
 
 export async function POST(request: Request) {
   try {
+    const rateLimit = await consumeRequestRateLimit(NEWSLETTER_RATE_LIMIT, request);
+    if (!rateLimit.allowed) {
+      return rateLimitJsonResponse(
+        "Too many signup attempts. Try again in a little bit.",
+        rateLimit.retryAfterSeconds
+      );
+    }
+
     const body = (await request.json().catch(() => ({}))) as { email?: string };
     const email = sanitizeEmailInput(body.email);
 
@@ -117,7 +149,10 @@ export async function POST(request: Request) {
       );
     }
 
-    await persistNewsletterSignup(email);
+    const signupState = await persistNewsletterSignup(email);
+    if (signupState === "duplicate") {
+      return NextResponse.json({ ok: true, message: "You're in." });
+    }
 
     const adminEmail =
       asString(process.env.NEWSLETTER_NOTIFY_EMAIL) ||

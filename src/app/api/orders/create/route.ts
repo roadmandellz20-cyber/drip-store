@@ -26,8 +26,18 @@ import {
   sanitizeSingleLineInput,
   sanitizeSlugInput,
 } from "@/lib/input";
+import {
+  consumeRequestRateLimit,
+  rateLimitJsonResponse,
+} from "@/lib/request-rate-limit";
 
 export const runtime = "nodejs";
+const ORDER_CREATE_RATE_LIMIT = {
+  scope: "orders-create",
+  windowSeconds: 10 * 60,
+  maxRequests: 8,
+  blockSeconds: 15 * 60,
+} as const;
 
 type IncomingItem = {
   id?: string;
@@ -723,6 +733,14 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "LOCKED — Opens April 1" },
         { status: 403 }
+      );
+    }
+
+    const rateLimit = await consumeRequestRateLimit(ORDER_CREATE_RATE_LIMIT, request);
+    if (!rateLimit.allowed) {
+      return rateLimitJsonResponse(
+        "Too many checkout attempts. Try again in a little bit.",
+        rateLimit.retryAfterSeconds
       );
     }
 

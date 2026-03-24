@@ -133,3 +133,5 @@ Run SQL files in `supabase/migrations/` in order:
 - `20260302_align_catalog_prices.sql`
 - `20260302_customer_order_email_state.sql`
 - `20260311_security_hardening.sql`
+- `20260324_update_limited_inventory_to_10.sql`
+- `20260324_security_abuse_hardening.sql`
