@@ -36,7 +36,7 @@ export type ProductInventorySnapshot = {
   soldOut?: boolean;
 };
 
-export const LIMITED_STOCK_QTY = 7;
+export const LIMITED_STOCK_QTY = 10;
 
 const SUPABASE_PRODUCT_IMAGE_BASE = (() => {
   const explicitBase = process.env.NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL?.trim();

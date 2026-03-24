@@ -105,7 +105,7 @@ begin
     group by product_id
   ) requested on requested.product_id = p.id
   where coalesce(p.is_limited, false)
-    and greatest(coalesce(p.stock_qty, 7) - coalesce(p.sold_qty, 0), 0) < requested.requested_qty
+    and greatest(coalesce(p.stock_qty, 10) - coalesce(p.sold_qty, 0), 0) < requested.requested_qty
   order by p.title
   limit 1;
 

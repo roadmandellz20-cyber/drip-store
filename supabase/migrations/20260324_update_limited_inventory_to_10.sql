@@ -1,97 +1,8 @@
--- MUGEN DISTRICT: launch repair for checkout RPC visibility in Supabase API
--- Run this in Supabase SQL Editor against production if /rest/v1/rpc/create_manual_order_with_inventory
--- returns PGRST202 (function missing from schema cache).
--- Safe to run multiple times.
-
-create sequence if not exists public.order_number_seq
-  start with 1
-  increment by 1
-  minvalue 1
-  no maxvalue
-  cache 1;
-
-create or replace function public.next_order_number()
-returns text
-language plpgsql
-as $$
-declare
-  seq_value bigint;
-  year_part text;
-begin
-  seq_value := nextval('public.order_number_seq');
-  year_part := extract(year from now())::text;
-  return 'MGN-' || year_part || '-' || lpad(seq_value::text, 6, '0');
-end;
-$$;
-
-alter table if exists public.orders
-  add column if not exists order_number text;
-
-alter table if exists public.orders
-  add column if not exists status text default 'pending';
-
-alter table if exists public.orders
-  add column if not exists shipping_address jsonb;
-
-alter table if exists public.orders
-  add column if not exists total_price_cents integer default 0;
-
-alter table if exists public.orders
-  add column if not exists note text;
-
-alter table if exists public.orders
-  alter column note set default '';
-
-alter table if exists public.order_items
-  add column if not exists product_slug text;
-
-alter table if exists public.order_items
-  add column if not exists unit_price_cents integer;
-
-alter table if exists public.order_items
-  add column if not exists line_total_cents integer;
-
-alter table if exists public.order_items
-  add column if not exists currency text;
-
-update public.orders
-set order_number = public.next_order_number()
-where order_number is null or btrim(order_number) = '';
-
-with ranked as (
-  select
-    id,
-    order_number,
-    row_number() over (partition by order_number order by created_at nulls last, id) as rn
-  from public.orders
-  where order_number is not null
-)
-update public.orders o
-set order_number = public.next_order_number()
-from ranked r
-where o.id = r.id and r.rn > 1;
-
-update public.orders
-set total_price_cents = coalesce(total_cents, 0)
-where coalesce(total_price_cents, 0) = 0
-  and coalesce(total_cents, 0) > 0;
-
-update public.orders
-set shipping_address = jsonb_build_object('formatted', customer_address)
-where shipping_address is null
-  and btrim(coalesce(customer_address, '')) <> '';
-
-update public.orders
-set note = ''
-where note is null;
-
-create unique index if not exists orders_idempotency_key_unique
-  on public.orders(idempotency_key)
-  where idempotency_key is not null;
-
-create unique index if not exists orders_order_number_unique
-  on public.orders(order_number)
-  where order_number is not null;
+update public.products
+set
+  stock_qty = 10,
+  sold_qty = coalesce(sold_qty, 0)
+where coalesce(is_limited, false);
 
 create or replace function public.create_manual_order_with_inventory(
   p_customer_name text,
@@ -210,34 +121,21 @@ begin
 
   begin
     insert into public.orders (
-      order_number,
-      status,
       customer_name,
       customer_email,
       customer_phone,
       customer_address,
-      shipping_address,
-      note,
       delivery_note,
       total_cents,
-      total_price_cents,
       currency,
       idempotency_key
     )
     values (
-      public.next_order_number(),
-      'pending',
       p_customer_name,
       p_customer_email,
       p_customer_phone,
       p_customer_address,
-      case
-        when nullif(btrim(p_customer_address), '') is null then null
-        else jsonb_build_object('formatted', p_customer_address)
-      end,
-      coalesce(nullif(btrim(p_delivery_note), ''), ''),
-      nullif(btrim(p_delivery_note), ''),
-      p_total_cents,
+      p_delivery_note,
       p_total_cents,
       upper(coalesce(nullif(btrim(p_currency), ''), 'GMD')),
       nullif(btrim(p_idempotency_key), '')
@@ -264,26 +162,18 @@ begin
   insert into public.order_items (
     order_id,
     product_id,
-    product_slug,
     title,
-    unit_price_cents,
     price_cents,
     size,
-    qty,
-    line_total_cents,
-    currency
+    qty
   )
   select
     v_order_id,
     product_id,
-    product_slug,
     title,
     price_cents,
-    price_cents,
     size,
-    qty,
-    price_cents * qty,
-    currency
+    qty
   from _mugen_order_lines;
 
   update public.products p
@@ -299,5 +189,3 @@ begin
   return query select v_order_id, false;
 end;
 $$;
-
-notify pgrst, 'reload schema';
