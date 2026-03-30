@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isLaunchLive } from "@/lib/launch";
+import { LOCKED_BUTTON_TEXT } from "@/lib/launch-copy";
 import { LIMITED_STOCK_QTY } from "@/lib/products";
 import {
   adminOrderEmail,
@@ -731,7 +732,7 @@ export async function POST(request: Request) {
 
     if (!isLaunchLive()) {
       return NextResponse.json(
-        { error: "LOCKED — Opens April 1" },
+        { error: LOCKED_BUTTON_TEXT },
         { status: 403 }
       );
     }

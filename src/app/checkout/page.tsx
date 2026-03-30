@@ -7,6 +7,7 @@ import LaunchCountdown from "@/components/LaunchCountdown";
 import ProductImage from "@/components/ProductImage";
 import { trackEvent } from "@/lib/analytics";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
+import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_FALLBACK_TEXT } from "@/lib/launch-copy";
 import {
   sanitizeEmailInput,
   sanitizeMultilineInput,
@@ -140,7 +141,7 @@ export default function CheckoutPage() {
   async function onPlaceOrder() {
     if (submitting) return;
     if (!live) {
-      setError("LOCKED — Opens April 1");
+      setError(LOCKED_BUTTON_TEXT);
       return;
     }
 
@@ -287,7 +288,7 @@ export default function CheckoutPage() {
                     <div className="checkout__name">{item.product.name}</div>
                     {item.product.isLimited ? (
                       <div className={`checkout__stock ${showSoldOut ? "checkout__stock--soldout" : ""}`}>
-                        {stockText || "DROPS APRIL 1"}
+                        {stockText || LOCKED_STOCK_FALLBACK_TEXT}
                       </div>
                     ) : null}
                     <div className="checkout__row">
@@ -524,7 +525,7 @@ export default function CheckoutPage() {
               {submitting
                 ? "PROCESSING..."
                 : !live
-                  ? "LOCKED — Opens April 1"
+                  ? LOCKED_BUTTON_TEXT
                   : inventoryState === "sold_out"
                     ? "SOLD OUT"
                     : inventoryState === "limited_stock"

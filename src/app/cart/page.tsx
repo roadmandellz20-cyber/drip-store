@@ -16,6 +16,7 @@ import {
 import ProductImage from "@/components/ProductImage";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
+import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_FALLBACK_TEXT } from "@/lib/launch-copy";
 import { getProductBySku, getProductStockText } from "@/lib/products";
 
 export default function CartPage() {
@@ -86,7 +87,7 @@ export default function CartPage() {
                     <div className="checkout__name">{item.product.name}</div>
                     {item.product.isLimited ? (
                       <div className={`checkout__stock ${showSoldOut ? "checkout__stock--soldout" : ""}`}>
-                        {stockText || "DROPS APRIL 1"}
+                        {stockText || LOCKED_STOCK_FALLBACK_TEXT}
                       </div>
                     ) : null}
                     <div className="checkout__row checkout__row--actions">
@@ -130,7 +131,7 @@ export default function CartPage() {
             ) : (
               <button className="btn btn--primary" type="button" disabled>
                 {!live
-                  ? "LOCKED — Opens April 1"
+                  ? LOCKED_BUTTON_TEXT
                   : inventoryState === "sold_out"
                     ? "SOLD OUT"
                     : "LIMITED STOCK"}

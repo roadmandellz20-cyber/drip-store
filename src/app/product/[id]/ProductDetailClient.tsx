@@ -9,6 +9,7 @@ import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
 import { trackEvent } from "@/lib/analytics";
 import { addToCart } from "@/lib/cart";
+import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_NOTE_TEXT } from "@/lib/launch-copy";
 import { getLaunchDate } from "@/lib/launch";
 import {
   warmProductImage,
@@ -228,7 +229,7 @@ function DetailRelatedProductCard({
                 <>
                   <div className="p-card__stock">{scarcityText}</div>
                   {showLaunchNote ? (
-                    <div className="p-card__statusNote">Opens April 1 (00:00)</div>
+                    <div className="p-card__statusNote">{LOCKED_STOCK_NOTE_TEXT}</div>
                   ) : null}
                 </>
               )}
@@ -246,7 +247,7 @@ function DetailRelatedProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
+              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>
@@ -335,7 +336,7 @@ export default function ProductDetailClient({
                 <span className="chip chip--limited">LIMITED ARCHIVE</span>
                 <span>{scarcityText}</span>
               </div>
-              {!launchLive ? <div className="detail__stockNote">Opens April 1 (00:00)</div> : null}
+              {!launchLive ? <div className="detail__stockNote">{LOCKED_STOCK_NOTE_TEXT}</div> : null}
               <div className="detail__stockSubline">Archive run. No restocks.</div>
             </div>
           ) : null}
@@ -369,7 +370,7 @@ export default function ProductDetailClient({
               {!launchLive ? (
                 <>
                   <button className="btn btn--primary" onClick={onAdd} disabled type="button">
-                    LOCKED — Opens April 1
+                    {LOCKED_BUTTON_TEXT}
                   </button>
                   <button className="btn btn--ghost" type="button" onClick={() => setWaitlistOpen(true)}>
                     GET DROP ALERT

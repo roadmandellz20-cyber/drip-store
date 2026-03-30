@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { sanitizeEmailInput, sanitizeSlugInput } from "@/lib/input";
+import { LOCKED_WAITLIST_TOAST_TEXT } from "@/lib/launch-copy";
 
 type WaitlistModalProps = {
   open: boolean;
@@ -91,9 +92,7 @@ export default function WaitlistModal({
         return;
       }
 
-      window.dispatchEvent(
-        new CustomEvent("mugen_toast", { detail: "You’re in. April 1 — don’t blink." })
-      );
+      window.dispatchEvent(new CustomEvent("mugen_toast", { detail: LOCKED_WAITLIST_TOAST_TEXT }));
       onClose();
     } catch {
       setError("Archive link failed. Try again.");

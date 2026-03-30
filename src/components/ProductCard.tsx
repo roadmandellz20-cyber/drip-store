@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
+import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_NOTE_TEXT } from "@/lib/launch-copy";
 import {
   hasDistinctLookImage,
   warmProductImage,
@@ -154,7 +155,7 @@ export default function ProductCard({
                 <>
                   <div className="p-card__stock">{scarcityText}</div>
                   {showLaunchNote ? (
-                    <div className="p-card__statusNote">Opens April 1 (00:00)</div>
+                    <div className="p-card__statusNote">{LOCKED_STOCK_NOTE_TEXT}</div>
                   ) : null}
                 </>
               )}
@@ -172,7 +173,7 @@ export default function ProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : "LOCKED — Opens April 1"}
+              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

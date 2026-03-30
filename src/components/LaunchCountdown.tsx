@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LOCKED_ORDERING_UNLOCKS_TEXT } from "@/lib/launch-copy";
 import { getLaunchDate } from "@/lib/launch";
 
 function pad2(n: number) {
@@ -102,7 +103,7 @@ export default function LaunchCountdown({
         <div className="launchBanner__sub">
           {isLive
             ? "The archive is open. Enter the Mugen."
-            : "Products are visible. Ordering unlocks April 1."}
+            : LOCKED_ORDERING_UNLOCKS_TEXT}
         </div>
       </div>
 

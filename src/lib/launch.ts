@@ -12,7 +12,7 @@ function asBooleanFlag(value: string) {
 }
 
 function getDefaultLaunchDate(now = new Date()) {
-  return new Date(now.getFullYear(), 3, 1, 0, 0, 0, 0);
+  return new Date(now.getFullYear(), 3, 30, 0, 0, 0, 0);
 }
 
 function getConfiguredLaunchDate(now = new Date()) {
