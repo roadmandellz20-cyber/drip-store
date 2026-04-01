@@ -3,6 +3,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FxLayer from "@/components/FxLayer";
+import TrustedNowProvider from "@/components/TrustedNowProvider";
 import BackHomeArrow from "@/components/BackHomeArrow";
 import { absoluteUrl, getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE } from "@/lib/site";
 import ToastClient from "./toast.client";
@@ -60,13 +61,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <FxLayer />
-        <Header />
-        <BackHomeArrow />
-        <main>{children}</main>
-        <Footer />
-        <div id="toast" aria-live="polite" aria-atomic="true" />
-        <ToastClient />
+        <TrustedNowProvider>
+          <FxLayer />
+          <Header />
+          <BackHomeArrow />
+          <main>{children}</main>
+          <Footer />
+          <div id="toast" aria-live="polite" aria-atomic="true" />
+          <ToastClient />
+        </TrustedNowProvider>
       </body>
     </html>
   );

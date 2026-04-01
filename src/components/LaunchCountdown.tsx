@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useTrustedNow } from "@/components/TrustedNowProvider";
 import { LOCKED_ORDERING_UNLOCKS_TEXT } from "@/lib/launch-copy";
 import { getLaunchDate } from "@/lib/launch";
 
@@ -54,24 +55,13 @@ export default function LaunchCountdown({
 }: {
   variant?: "banner" | "inline";
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const { now, synced } = useTrustedNow();
   const launchDate = useMemo(() => getLaunchDate(new Date(now)), [now]);
-
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    tick();
-
-    const t = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(t);
-  }, []);
 
   if (!launchDate) return null;
 
   const diff = launchDate.getTime() - now;
-  const isLive = diff <= 0;
+  const isLive = synced && diff <= 0;
 
   const totalSeconds = Math.floor(Math.max(0, diff) / 1000);
   const days = Math.floor(totalSeconds / 86400);

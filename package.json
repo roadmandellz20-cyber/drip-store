@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test src/lib/email/send.test.ts src/lib/email/templates.test.ts src/lib/orders/email-state.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/email/send.test.ts src/lib/email/templates.test.ts src/lib/orders/email-state.test.ts src/lib/launch.test.ts",
     "admin:hash": "node scripts/admin-hash.mjs"
   },
   "dependencies": {

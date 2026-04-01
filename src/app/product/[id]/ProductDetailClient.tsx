@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ProductImage from "@/components/ProductImage";
+import { useTrustedNow } from "@/components/TrustedNowProvider";
 import WaitlistModal from "@/components/WaitlistModal";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
@@ -42,24 +43,13 @@ function triggerCardPulse(el: HTMLElement | null) {
 }
 
 function DetailCountdownBlocks() {
-  const [now, setNow] = useState(() => Date.now());
+  const { now, synced } = useTrustedNow();
   const launchDate = useMemo(() => getLaunchDate(new Date(now)), [now]);
-
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    tick();
-
-    const t = window.setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(t);
-  }, []);
 
   if (!launchDate) return null;
 
   const diff = launchDate.getTime() - now;
-  const isLive = diff <= 0;
+  const isLive = synced && diff <= 0;
   if (isLive) {
     return (
       <div className="launchInline">
