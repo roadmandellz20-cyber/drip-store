@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <div id="toast" aria-live="polite" aria-atomic="true" />
           <ToastClient />
+          <SpeedInsights />
         </TrustedNowProvider>
       </body>
     </html>
