@@ -13,6 +13,7 @@ import { addToCart } from "@/lib/cart";
 import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_NOTE_TEXT } from "@/lib/launch-copy";
 import { getLaunchDate } from "@/lib/launch";
 import {
+  hasDistinctLookImage,
   warmProductImage,
   warnOnDuplicateLookImage,
 } from "@/lib/product-images";
@@ -20,10 +21,6 @@ import { getProductUiState, type Product } from "@/lib/products";
 
 function pad2(n: number) {
   return String(Math.max(0, Math.floor(n))).padStart(2, "0");
-}
-
-function normalizeImageUrl(value?: string) {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -109,8 +106,7 @@ function DetailRelatedProductCard({
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
   const showLaunchNote = product.isLimited && !launchLive;
-  const hoverSwapEnabled =
-    normalizeImageUrl(product.lookImageUrl) !== normalizeImageUrl(product.imageUrl);
+  const hoverSwapEnabled = hasDistinctLookImage(product);
   const cardBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
   const cardRef = useRef<HTMLElement | null>(null);
   const warmedRef = useRef(false);

@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    qualities: [58, 72, 75, 82],
     remotePatterns: supabaseHost
       ? [
           {

@@ -321,7 +321,7 @@ const BASE_PRODUCTS: Product[] = [
     id: "ichigo-02",
     sku: "ichigo-02",
     name: "Tensa Zangetsu Fragment Tee (White Distressed)",
-    price: 1500,
+    price: 2000,
     ...buildProductImages("ichigo-02"),
     ...buildInventoryDefaults(false),
     isNew: false,

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local skill tooling is not part of the storefront app.
+    "ui-ux-pro-max-skill/**",
   ]),
 ]);
 

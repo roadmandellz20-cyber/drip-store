@@ -22,9 +22,12 @@ export function getPreferredProductImageSrc(src: string, fallbackSrc?: string): 
   return src;
 }
 
-export function getProductAssetVariantUrl(src: string, width: number) {
-  const match = src.match(PRODUCT_IMAGE_PATH_RE);
-  if (!match) return src;
+export function getProductAssetVariantUrl(src: string | null | undefined, width: number) {
+  const normalizedSrc = normalizeProductSrc(src);
+  if (!normalizedSrc) return "";
+
+  const match = normalizedSrc.match(PRODUCT_IMAGE_PATH_RE);
+  if (!match) return normalizedSrc;
 
   const basePath = match[1];
 
@@ -54,7 +57,7 @@ export function getProductDisplaySrc(
   return src;
 }
 
-function normalizeProductSrc(src?: string) {
+function normalizeProductSrc(src?: string | null) {
   return typeof src === "string" ? src.trim() : "";
 }
 
@@ -114,9 +117,12 @@ export function getProductImageBlurDataUrl() {
   return "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%23101010'/%3E%3Cstop offset='1' stop-color='%23221919'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='48' height='48' fill='url(%23g)'/%3E%3C/svg%3E";
 }
 
-export function warmProductImage(src: string, width = 900) {
+export function warmProductImage(src: string | null | undefined, width = 900) {
   if (typeof window === "undefined") return;
 
+  const warmedSrc = getProductAssetVariantUrl(src, width);
+  if (!warmedSrc) return;
+
   const img = new window.Image();
-  img.src = getProductAssetVariantUrl(src, width);
+  img.src = warmedSrc;
 }
