@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  cartItemToProductSnapshot,
   cartTotal,
   decQty,
   getCartInventoryState,
@@ -16,7 +17,7 @@ import {
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_FALLBACK_TEXT } from "@/lib/launch-copy";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
-import { getProductBySku, getProductStockText } from "@/lib/products";
+import { getProductStockText } from "@/lib/products";
 import ProductImage from "./ProductImage";
 
 function triggerButtonGlitch(el: HTMLElement | null) {
@@ -37,10 +38,7 @@ export default function CartDrawer({
   const [items, setItems] = useState<CartItem[]>([]);
   const live = useLaunchLive();
   const cartProducts = useMemo(
-    () =>
-      items
-        .map((item) => getProductBySku(item.product.sku))
-        .filter((product): product is NonNullable<typeof product> => Boolean(product)),
+    () => items.map((item) => cartItemToProductSnapshot(item)),
     [items]
   );
   const liveProducts = useLiveProducts(cartProducts);

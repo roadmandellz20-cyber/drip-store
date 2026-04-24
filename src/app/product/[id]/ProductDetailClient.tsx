@@ -107,7 +107,8 @@ function DetailRelatedProductCard({
   const addDisabled = !launchLive || soldOutUi;
   const showLaunchNote = product.isLimited && !launchLive;
   const hoverSwapEnabled = hasDistinctLookImage(product);
-  const cardBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
+  const cardBrandLine =
+    product.brandLine || (product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.");
   const cardRef = useRef<HTMLElement | null>(null);
   const warmedRef = useRef(false);
 
@@ -129,7 +130,7 @@ function DetailRelatedProductCard({
     if (warmedRef.current) return;
     warmedRef.current = true;
 
-    router.prefetch(`/product/${product.id}`);
+    router.prefetch(`/product/${product.sku}`);
     warmProductImage(product.imageFallbackUrl || product.imageUrl, 1600);
     if (hoverSwapEnabled) {
       warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
@@ -162,7 +163,7 @@ function DetailRelatedProductCard({
 
         <Link
           className={`p-card__imgWrap ${leadLoaded ? "p-card__imgWrap--loaded" : ""} ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
-          href={`/product/${product.id}`}
+          href={`/product/${product.sku}`}
           aria-label={product.name}
           onTouchStart={warmDetailAssets}
           onFocus={warmDetailAssets}
@@ -240,7 +241,7 @@ function DetailRelatedProductCard({
 
             <Link
               className="p-card__view"
-              href={`/product/${product.id}`}
+              href={`/product/${product.sku}`}
               onClick={(e) => triggerButtonGlitch(e.currentTarget)}
               onTouchStart={warmDetailAssets}
               onFocus={warmDetailAssets}
@@ -270,7 +271,7 @@ export default function ProductDetailClient({
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
   const addDisabled = !launchLive || soldOutUi;
   const detailBrandLine =
-    product.isLimited === true ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
+    product.brandLine || (product.isLimited === true ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.");
 
   const sizeOptions = useMemo(() => ["S", "M", "L", "XL"] as const, []);
 

@@ -67,6 +67,49 @@ function toCartProduct(product: Product): CartItem["product"] {
   };
 }
 
+export function cartItemToProductSnapshot(item: CartItem): Product {
+  const sku = sanitizeSlugInput(item.product.sku, 64);
+  const name = sanitizeSingleLineInput(item.product.name, { maxLength: 160 }) || sku || item.id;
+  const id = sanitizeIdInput(item.product.id || item.id, 120) || sku || item.id;
+  const isLimited = Boolean(item.product.isLimited);
+  const stockQty =
+    typeof item.product.stockQty === "number"
+      ? item.product.stockQty
+      : isLimited
+        ? LIMITED_STOCK_QTY
+        : null;
+  const soldQty = typeof item.product.soldQty === "number" ? item.product.soldQty : 0;
+  const available =
+    typeof item.product.available === "number"
+      ? item.product.available
+      : isLimited && stockQty !== null
+        ? Math.max(0, stockQty - soldQty)
+        : null;
+
+  return {
+    id,
+    sku: sku || id,
+    name,
+    price: item.product.price,
+    imageUrl: item.product.imageUrl,
+    imageFallbackUrl: item.product.imageFallbackUrl || item.product.imageUrl,
+    lookImageUrl: null as unknown as string,
+    lookImageFallbackUrl: null as unknown as string,
+    limited: isLimited,
+    isLimited,
+    stockQty,
+    soldQty,
+    available,
+    availableQty: available,
+    soldOut: Boolean(item.product.soldOut),
+    isNew: false,
+    category: isLimited ? "limited" : "all",
+    description: "",
+    details: [],
+    brandLine: "ENTER THE MUGEN.",
+  };
+}
+
 function resolveCatalogProduct(item: Record<string, unknown>) {
   const product = item.product;
   if (!isRecord(product)) return null;

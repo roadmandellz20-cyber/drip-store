@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ProductDetailClient from "./ProductDetailClient";
 import { sanitizeSlugInput } from "@/lib/input";
-import { getProduct, getRelatedProducts } from "@/lib/products";
-import { fetchProductsWithInventory } from "@/lib/products-server";
+import { fetchProductBySlug, fetchRelatedProducts } from "@/lib/products-server";
 import { absoluteUrl, extractSummary } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const resolvedParams = await params;
-  const product = getProduct(sanitizeSlugInput(resolvedParams.id, 64));
+  const product = await fetchProductBySlug(sanitizeSlugInput(resolvedParams.id, 64));
 
   if (!product) {
     return {
@@ -28,7 +27,7 @@ export async function generateMetadata({
 
   const description = extractSummary(product.description);
   const image = product.imageFallbackUrl || product.imageUrl;
-  const canonicalPath = `/product/${product.id}`;
+  const canonicalPath = `/product/${product.sku}`;
 
   return {
     title: product.name,
@@ -64,10 +63,8 @@ export default async function ProductDetailPage({
 }) {
   const resolvedParams = await params;
   const productId = sanitizeSlugInput(resolvedParams.id, 64);
-  const [liveProduct] = await fetchProductsWithInventory([productId]);
-  const fallbackProduct = getProduct(productId);
-  const product = liveProduct || fallbackProduct;
-  const relatedProducts = product ? getRelatedProducts(product, 3) : [];
+  const product = await fetchProductBySlug(productId);
+  const relatedProducts = product ? await fetchRelatedProducts(product, 3) : [];
 
   if (!product) {
     return (

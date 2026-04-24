@@ -1,8 +1,8 @@
 import type { MetadataRoute } from "next";
-import { ALL_PRODUCTS } from "@/lib/products";
+import { fetchProductsWithInventory } from "@/lib/products-server";
 import { absoluteUrl } from "@/lib/site";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages = [
     "/archive",
     "/store",
@@ -19,8 +19,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: path === "/archive" ? 1 : 0.7,
   }));
 
-  const productEntries = ALL_PRODUCTS.map((product) => ({
-    url: absoluteUrl(`/product/${product.id}`),
+  const products = await fetchProductsWithInventory();
+  const productEntries = products.map((product) => ({
+    url: absoluteUrl(`/product/${product.sku}`),
     changeFrequency: "weekly" as const,
     priority: product.isLimited ? 0.9 : 0.8,
   }));

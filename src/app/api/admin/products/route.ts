@@ -8,15 +8,11 @@ import {
   isSameOriginRequest,
   verifyAdminSession,
 } from "@/lib/admin-auth";
-import { sanitizeSlugInput } from "@/lib/input";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 
-export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ sku: string }> }
-) {
+export async function POST(request: NextRequest) {
   if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   }
@@ -26,12 +22,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const { sku } = await context.params;
-  const slug = sanitizeSlugInput(sku, 64);
-  if (!slug) {
-    return NextResponse.json({ error: "Invalid SKU." }, { status: 400 });
-  }
-
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -39,22 +29,30 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  if ("slug" in body) {
-    return NextResponse.json({ error: "slug cannot be updated." }, { status: 400 });
-  }
-
-  const parsed = validateAdminProductPayload(body, "update");
+  const parsed = validateAdminProductPayload(body, "create");
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const existing = await supabaseAdmin.from("products").select("id,slug").eq("slug", slug).maybeSingle();
-  if (existing.error || !existing.data) {
-    return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  const payload = parsed.value;
+
+  const existing = await supabaseAdmin
+    .from("products")
+    .select("id,slug")
+    .eq("slug", payload.slug)
+    .maybeSingle();
+
+  if (existing.data) {
+    return NextResponse.json({ error: "A product with that slug already exists." }, { status: 409 });
   }
 
-  const payload = parsed.value;
-  const updates = {
+  if (existing.error) {
+    console.error("[admin/products] create lookup error", existing.error.message);
+    return NextResponse.json({ error: "Unable to validate slug." }, { status: 500 });
+  }
+
+  const insertPayload = {
+    slug: payload.slug,
     title: payload.title,
     description: payload.description,
     details: payload.details,
@@ -69,20 +67,16 @@ export async function PATCH(
     is_active: payload.is_active,
     is_limited: payload.is_limited,
     stock_qty: payload.stock_qty,
+    sold_qty: 0,
     is_new: payload.is_new,
     sort_order: payload.sort_order,
   };
 
-  const result = await supabaseAdmin
-    .from("products")
-    .update(updates)
-    .eq("slug", slug)
-    .select("*")
-    .maybeSingle();
+  const result = await supabaseAdmin.from("products").insert(insertPayload).select("*").maybeSingle();
 
   if (result.error || !result.data) {
-    console.error("[admin/products] update error", result.error?.message);
-    return NextResponse.json({ error: "Update failed." }, { status: 500 });
+    console.error("[admin/products] create error", result.error?.message);
+    return NextResponse.json({ error: "Create failed." }, { status: 500 });
   }
 
   return NextResponse.json({

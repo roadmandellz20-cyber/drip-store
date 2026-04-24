@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 
 export default async function ArchivePage() {
   const products = await fetchProductsWithInventory();
+  const limitedCount = products.filter((product) => product.isLimited).length;
 
   return (
     <div className="archive">
@@ -78,7 +79,9 @@ export default async function ArchivePage() {
       <section className="section">
         <div className="section__head">
           <h2 className="section__title">THE ARCHIVE</h2>
-          <p className="section__note">Drop 001 — Five pieces. Three limited. No restocks.</p>
+          <p className="section__note">
+            Drop 001 — {products.length} piece{products.length !== 1 ? "s" : ""}. {limitedCount} limited. No restocks.
+          </p>
         </div>
 
         <ProductGrid products={products} />

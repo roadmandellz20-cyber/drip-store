@@ -14,6 +14,7 @@ import {
   sanitizeSingleLineInput,
 } from "@/lib/input";
 import {
+  cartItemToProductSnapshot,
   getCartInventoryState,
   cartTotal,
   clearCart,
@@ -26,7 +27,7 @@ import {
   type CartItem,
 } from "@/lib/cart";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
-import { getProductBySku, getProductStockText } from "@/lib/products";
+import { getProductStockText } from "@/lib/products";
 import { createOrderSuccessSummary, writeOrderSuccessSummary } from "@/lib/order-success";
 
 type ShippingForm = {
@@ -94,10 +95,7 @@ export default function CheckoutPage() {
   const beganCheckoutRef = useRef(false);
   const live = useLaunchLive();
   const cartProducts = useMemo(
-    () =>
-      items
-        .map((item) => getProductBySku(item.product.sku))
-        .filter((product): product is NonNullable<typeof product> => Boolean(product)),
+    () => items.map((item) => cartItemToProductSnapshot(item)),
     [items]
   );
   const liveProducts = useLiveProducts(cartProducts);

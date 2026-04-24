@@ -1,46 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import type { AdminProduct } from "./page";
-
-const STATUS_OPTIONS = ["AVAILABLE", "LIMITED", "ARCHIVED"] as const;
-
-type SaveResult = "idle" | "ok" | "error";
-
-type RowState = {
-  stock_qty: string;
-  is_limited: boolean;
-  status: string;
-  saving: boolean;
-  result: SaveResult;
-  errorMsg: string;
-};
-
-function buildRowState(p: AdminProduct): RowState {
-  return {
-    stock_qty: p.stock_qty !== null ? String(p.stock_qty) : "",
-    is_limited: p.is_limited,
-    status: p.status,
-    saving: false,
-    result: "idle",
-    errorMsg: "",
-  };
-}
-
-function isDirty(original: AdminProduct, current: RowState) {
-  const origStock = original.stock_qty !== null ? String(original.stock_qty) : "";
-  return (
-    current.stock_qty !== origStock ||
-    current.is_limited !== original.is_limited ||
-    current.status !== original.status
-  );
-}
+import Link from "next/link";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { AdminProduct } from "@/lib/admin-products";
 
 const cell: React.CSSProperties = {
   padding: "10px 14px",
   borderBottom: "1px solid var(--line)",
   whiteSpace: "nowrap",
   verticalAlign: "middle",
+  fontSize: "13px",
+  fontFamily: "var(--mono)",
 };
 
 const head: React.CSSProperties = {
@@ -54,220 +25,202 @@ const head: React.CSSProperties = {
   textAlign: "left",
 };
 
-const inputStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--line)",
-  color: "var(--fg)",
-  padding: "4px 8px",
-  fontFamily: "var(--mono)",
-  fontSize: "12px",
-  width: "80px",
-  outline: "none",
-};
+function formatAmount(cents: number, currency: string) {
+  return `${currency.toUpperCase()} ${Math.round(cents / 100).toLocaleString()}`;
+}
 
-const selectStyle: React.CSSProperties = {
-  background: "#0d0d0d",
-  border: "1px solid var(--line)",
-  color: "var(--fg)",
-  padding: "4px 8px",
-  fontFamily: "var(--mono)",
-  fontSize: "12px",
-  cursor: "pointer",
-  outline: "none",
-};
+function getVisibilityLabel(product: AdminProduct) {
+  if (!product.is_active || product.status === "ARCHIVED") return "ARCHIVED";
+  return "LIVE";
+}
 
 export default function ProductsTable({ products }: { products: AdminProduct[] }) {
-  const [rows, setRows] = useState<Record<string, RowState>>(() => {
-    const init: Record<string, RowState> = {};
-    for (const p of products) {
-      init[p.slug] = buildRowState(p);
-    }
-    return init;
-  });
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [rowState, setRowState] = useState<Record<string, { saving?: boolean; error?: string }>>({});
+  const [isPending, startTransition] = useTransition();
 
-  const update = useCallback((slug: string, patch: Partial<RowState>) => {
-    setRows((prev) => ({ ...prev, [slug]: { ...prev[slug], ...patch } }));
-  }, []);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return products;
 
-  const save = useCallback(
-    async (product: AdminProduct) => {
-      const row = rows[product.slug];
-      if (!row || row.saving) return;
+    return products.filter((product) =>
+      [
+        product.slug,
+        product.title,
+        product.status,
+        product.is_new ? "new" : "",
+        product.is_limited ? "limited" : "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [products, query]);
 
-      const stockQtyStr = row.stock_qty.trim();
-      const stockQty =
-        stockQtyStr === "" ? null : parseInt(stockQtyStr, 10);
+  async function toggleArchive(product: AdminProduct) {
+    setRowState((prev) => ({ ...prev, [product.slug]: { saving: true } }));
 
-      if (stockQtyStr !== "" && (isNaN(stockQty!) || stockQty! < 0)) {
-        update(product.slug, { result: "error", errorMsg: "Invalid stock qty." });
-        return;
+    const nextStatus = product.status === "ARCHIVED" ? (product.is_limited ? "LIMITED" : "AVAILABLE") : "ARCHIVED";
+    const nextActive = nextStatus !== "ARCHIVED";
+
+    try {
+      const response = await fetch(`/api/admin/products/${encodeURIComponent(product.slug)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: product.title,
+          description: product.description,
+          details: product.details,
+          brand_line: product.brand_line,
+          image_url: product.image_url,
+          price_cents: product.price_cents,
+          currency: product.currency,
+          status: nextStatus,
+          is_active: nextActive,
+          is_limited: product.is_limited,
+          stock_qty: product.stock_qty,
+          is_new: product.is_new,
+          sort_order: product.sort_order,
+        }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Update failed.");
       }
 
-      update(product.slug, { saving: true, result: "idle", errorMsg: "" });
-
-      try {
-        const res = await fetch(
-          `/api/admin/products/${encodeURIComponent(product.slug)}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              stock_qty: stockQty,
-              is_limited: row.is_limited,
-              status: row.status,
-            }),
-          }
-        );
-
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          error?: string;
-        };
-
-        if (!res.ok || !data.ok) {
-          update(product.slug, {
-            saving: false,
-            result: "error",
-            errorMsg: data.error ?? "Save failed.",
-          });
-        } else {
-          update(product.slug, { saving: false, result: "ok", errorMsg: "" });
-        }
-      } catch {
-        update(product.slug, {
+      startTransition(() => router.refresh());
+    } catch (error) {
+      setRowState((prev) => ({
+        ...prev,
+        [product.slug]: {
           saving: false,
-          result: "error",
-          errorMsg: "Network error.",
-        });
-      }
-    },
-    [rows, update]
-  );
+          error: error instanceof Error ? error.message : "Update failed.",
+        },
+      }));
+      return;
+    }
+
+    setRowState((prev) => ({ ...prev, [product.slug]: { saving: false } }));
+  }
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table
+    <div>
+      <div
         style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "13px",
-          fontFamily: "var(--mono)",
+          marginBottom: "16px",
+          display: "flex",
+          gap: "12px",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
         }}
       >
-        <thead>
-          <tr>
-            <th style={head}>SKU</th>
-            <th style={head}>NAME</th>
-            <th style={head}>PRICE</th>
-            <th style={head}>LIMITED</th>
-            <th style={head}>STOCK QTY</th>
-            <th style={head}>SOLD QTY</th>
-            <th style={head}>STATUS</th>
-            <th style={head}>SOLD OUT</th>
-            <th style={head}>SAVE</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((product) => {
-            const row = rows[product.slug];
-            if (!row) return null;
-            const dirty = isDirty(product, row);
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="search"
+            placeholder="Search by SKU, name, status..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--line)",
+              color: "var(--fg)",
+              padding: "8px 12px",
+              fontFamily: "var(--mono)",
+              fontSize: "12px",
+              width: "320px",
+              outline: "none",
+            }}
+          />
+          <span
+            style={{
+              fontSize: "11px",
+              color: "var(--muted)",
+              fontFamily: "var(--mono)",
+            }}
+          >
+            {filtered.length} / {products.length}
+          </span>
+        </div>
 
-            return (
-              <tr
-                key={product.slug}
-                style={{ opacity: product.is_active ? 1 : 0.45 }}
-              >
-                <td style={{ ...cell, color: "var(--muted)", letterSpacing: ".06em" }}>
-                  {product.slug}
-                </td>
-                <td style={{ ...cell, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {product.title}
-                </td>
-                <td style={{ ...cell, color: "var(--muted)" }}>
-                  GMD {Math.round(product.price_cents / 100).toLocaleString()}
-                </td>
-                <td style={cell}>
-                  <input
-                    type="checkbox"
-                    checked={row.is_limited}
-                    onChange={(e) =>
-                      update(product.slug, {
-                        is_limited: e.target.checked,
-                        result: "idle",
-                      })
-                    }
-                    style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#fff" }}
-                  />
-                </td>
-                <td style={cell}>
-                  <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={row.stock_qty}
-                    placeholder="—"
-                    onChange={(e) =>
-                      update(product.slug, { stock_qty: e.target.value, result: "idle" })
-                    }
-                    style={inputStyle}
-                  />
-                </td>
-                <td style={{ ...cell, color: "var(--muted)" }}>{product.sold_qty}</td>
-                <td style={cell}>
-                  <select
-                    value={row.status}
-                    onChange={(e) =>
-                      update(product.slug, { status: e.target.value, result: "idle" })
-                    }
-                    style={selectStyle}
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td style={cell}>
-                  <span
-                    style={{
-                      color: product.soldOut ? "var(--red)" : "rgba(255,255,255,.3)",
-                      fontWeight: product.soldOut ? 700 : 400,
-                      letterSpacing: ".08em",
-                    }}
-                  >
-                    {product.soldOut ? "YES" : "NO"}
-                  </span>
-                </td>
-                <td style={{ ...cell, minWidth: "120px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <button
-                      className="btn btn--primary"
-                      type="button"
-                      style={{ fontSize: "11px", padding: "5px 12px", opacity: dirty && !row.saving ? 1 : 0.35 }}
-                      disabled={!dirty || row.saving}
-                      onClick={() => save(product)}
-                    >
-                      {row.saving ? "..." : "SAVE"}
-                    </button>
-                    {row.result === "ok" && (
-                      <span style={{ color: "#4caf50", fontSize: "11px", letterSpacing: ".06em" }}>
-                        SAVED
-                      </span>
-                    )}
-                    {row.result === "error" && (
-                      <span style={{ color: "var(--red)", fontSize: "11px" }}>
-                        {row.errorMsg}
-                      </span>
-                    )}
-                  </div>
-                </td>
+        <Link className="btn btn--primary" href="/admin/products/new">
+          NEW PRODUCT
+        </Link>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="checkout__note">No products match.</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={head}>SKU</th>
+                <th style={head}>NAME</th>
+                <th style={head}>PRICE</th>
+                <th style={head}>STATUS</th>
+                <th style={head}>LIMITED</th>
+                <th style={head}>STOCK</th>
+                <th style={head}>SOLD</th>
+                <th style={head}>NEW</th>
+                <th style={head}>VISIBILITY</th>
+                <th style={head}>ACTIONS</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {filtered.map((product) => {
+                const row = rowState[product.slug];
+                const saving = Boolean(row?.saving) || isPending;
+
+                return (
+                  <tr key={product.slug} style={{ opacity: product.is_active ? 1 : 0.5 }}>
+                    <td style={{ ...cell, color: "var(--muted)" }}>{product.slug}</td>
+                    <td style={{ ...cell, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {product.title}
+                    </td>
+                    <td style={{ ...cell, color: "var(--muted)" }}>
+                      {formatAmount(product.price_cents, product.currency)}
+                    </td>
+                    <td style={cell}>{product.status}</td>
+                    <td style={cell}>{product.is_limited ? "YES" : "NO"}</td>
+                    <td style={cell}>{product.stock_qty ?? "—"}</td>
+                    <td style={cell}>{product.sold_qty}</td>
+                    <td style={cell}>{product.is_new ? "YES" : "NO"}</td>
+                    <td style={cell}>{getVisibilityLabel(product)}</td>
+                    <td style={{ ...cell, minWidth: "220px" }}>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <Link
+                          className="btn btn--ghost"
+                          href={`/admin/products/${encodeURIComponent(product.slug)}`}
+                          style={{ fontSize: "11px", padding: "4px 10px" }}
+                        >
+                          EDIT
+                        </Link>
+                        <button
+                          className={product.status === "ARCHIVED" ? "btn btn--primary" : "btn btn--ghost"}
+                          type="button"
+                          disabled={saving}
+                          style={{ fontSize: "11px", padding: "4px 10px" }}
+                          onClick={() => void toggleArchive(product)}
+                        >
+                          {saving ? "..." : product.status === "ARCHIVED" ? "UNARCHIVE" : "ARCHIVE"}
+                        </button>
+                        {row?.error ? (
+                          <span style={{ color: "var(--red)", fontSize: "11px" }}>{row.error}</span>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

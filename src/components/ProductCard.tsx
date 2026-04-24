@@ -48,7 +48,8 @@ export default function ProductCard({
   const addDisabled = !launchLive || soldOutUi;
   const showLaunchNote = product.isLimited && !launchLive;
   const hoverSwapEnabled = hasDistinctLookImage(product);
-  const cardBrandLine = product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.";
+  const cardBrandLine =
+    product.brandLine || (product.isLimited ? "LIMITED ARCHIVE PIECE" : "ENTER THE MUGEN.");
 
   const tiltClass = useMemo(() => {
     const seed = product.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -77,7 +78,7 @@ export default function ProductCard({
     if (warmedRef.current) return;
     warmedRef.current = true;
 
-    router.prefetch(`/product/${product.id}`);
+    router.prefetch(`/product/${product.sku}`);
     warmProductImage(product.imageFallbackUrl || product.imageUrl, 1600);
     if (hoverSwapEnabled) {
       warmProductImage(product.lookImageFallbackUrl || product.lookImageUrl, 900);
@@ -101,7 +102,7 @@ export default function ProductCard({
 
         <Link
           className={`p-card__imgWrap ${leadLoaded ? "p-card__imgWrap--loaded" : ""} ${soldOutUi ? "p-card__imgWrap--soldout" : ""}`}
-          href={`/product/${product.id}`}
+          href={`/product/${product.sku}`}
           aria-label={product.name}
           onTouchStart={warmDetailAssets}
           onFocus={warmDetailAssets}
@@ -180,7 +181,7 @@ export default function ProductCard({
 
             <Link
               className="p-card__view"
-              href={`/product/${product.id}`}
+              href={`/product/${product.sku}`}
               onClick={(e) => triggerButtonGlitch(e.currentTarget)}
               onTouchStart={warmDetailAssets}
               onFocus={warmDetailAssets}

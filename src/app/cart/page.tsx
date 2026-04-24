@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  cartItemToProductSnapshot,
   cartTotal,
   decQty,
   getCartInventoryState,
@@ -17,16 +18,13 @@ import ProductImage from "@/components/ProductImage";
 import { useLaunchLive } from "@/hooks/useLaunchLive";
 import { useLiveProducts } from "@/hooks/useLiveProducts";
 import { LOCKED_BUTTON_TEXT, LOCKED_STOCK_FALLBACK_TEXT } from "@/lib/launch-copy";
-import { getProductBySku, getProductStockText } from "@/lib/products";
+import { getProductStockText } from "@/lib/products";
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
   const live = useLaunchLive();
   const cartProducts = useMemo(
-    () =>
-      items
-        .map((item) => getProductBySku(item.product.sku))
-        .filter((product): product is NonNullable<typeof product> => Boolean(product)),
+    () => items.map((item) => cartItemToProductSnapshot(item)),
     [items]
   );
   const liveProducts = useLiveProducts(cartProducts);

@@ -48,11 +48,11 @@ const SUPABASE_PRODUCT_IMAGE_BASE = (() => {
   return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/products`;
 })();
 
-function getLocalProductImageUrl(sku: string) {
+export function getLocalProductImageUrl(sku: string) {
   return `/archive/assets/products/${sku}.jpg`;
 }
 
-function getCanonicalProductImageUrl(sku: string) {
+export function getCanonicalProductImageUrl(sku: string) {
   if (!SUPABASE_PRODUCT_IMAGE_BASE) {
     return getLocalProductImageUrl(sku);
   }
@@ -340,7 +340,8 @@ const BASE_PRODUCTS: Product[] = [
   },
 ];
 
-export const ALL_PRODUCTS = BASE_PRODUCTS.map((product) => applyProductInventory(product));
+export const LEGACY_PRODUCTS = BASE_PRODUCTS.map((product) => applyProductInventory(product));
+export const ALL_PRODUCTS = LEGACY_PRODUCTS;
 export const getProduct = (id: string) => {
   const normalizedId = sanitizeIdInput(id, 64);
   const product = ALL_PRODUCTS.find((item) => item.id === normalizedId);
