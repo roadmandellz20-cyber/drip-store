@@ -10,76 +10,97 @@ If you are Claude in a Project/chat, use this file plus [README.md](/Users/qtv/d
 - Project name: `MUGEN DISTRICT`
 - Repo path: `/Users/qtv/drip-store`
 - Stack: Next.js App Router, React 19, TypeScript, Tailwind/PostCSS, Supabase, Resend
+- Package name: `drip-store`
 - Primary domain: `https://mugendistrict.com`
-- Product type: anime/streetwear ecommerce-style storefront with a manual order flow
+- Site type: anime/streetwear storefront with a manual post-order payment and fulfillment flow
 - Brand premise: West African grit + Neo-Tokyo aesthetics, archive energy, limited drops, no mass restocks
 
-## What The Site Currently Is
+## Core Truth
 
-This is not a standard automated Shopify-style checkout.
+This is not a normal card-checkout ecommerce site.
 
-The live flow is:
+The real flow is:
 
-1. User browses the archive/store/product pages.
-2. User adds pieces to cart.
-3. User submits shipping details on `/checkout`.
-4. `POST /api/orders/create` validates product data against Supabase, creates the order, inserts order items, and attempts emails.
-5. User lands on `/success` with an order reference.
-6. User is prompted to confirm via WhatsApp or phone.
-7. Payment and delivery are handled manually afterward.
+1. User enters through `/archive` and browses archive/store/product pages.
+2. User adds products to the client-side cart.
+3. User goes to `/checkout` and submits shipping details.
+4. `POST /api/orders/create` validates products and pricing against Supabase, inserts the order, inserts order items, and attempts email.
+5. User lands on `/success` with an order reference like `MGN-XXXXXXXX`.
+6. User is told to confirm on WhatsApp or call.
+7. Payment and delivery happen manually afterward.
 
-Important: `src/app/api/checkout/route.ts` is intentionally deprecated and returns `410`.
-The real checkout path is `POST /api/orders/create`.
+Important:
+
+- `src/app/api/checkout/route.ts` is intentionally deprecated and returns `410`.
+- The real order endpoint is `POST /api/orders/create`.
+- Email failure must not block successful order creation.
+- Manual payment / manual follow-up is part of the current business model.
 
 ## Information Architecture
 
 - `/` redirects to `/archive`
 - `/archive` is the real landing page and brand entry point
-- `/store` shows all products with search
-- `/limited` filters limited pieces
-- `/new` filters new pieces
+- `/store` shows all products and search
+- `/limited` shows limited products only
+- `/new` shows new products only
 - `/product/[id]` is the product detail experience
-- `/cart` is the client cart
-- `/checkout` collects shipping info and places manual orders
-- `/success` shows the archived order confirmation state and WhatsApp/call actions
-- `/about` explains the brand world
-- `/privacy`, `/refunds`, `/terms` are present and production-facing
+- `/cart` is the client cart page
+- `/checkout` is the shipping + manual order submission page
+- `/success` is the manual-confirmation / order-archived page
+- `/about`, `/privacy`, `/refunds`, `/terms` are live production-facing pages
 - `/admin/login` and `/admin/orders` are the lightweight admin tools
 
-## Current Brand And UX Rules
+## Current Brand Canon
 
-Protect these unless the user explicitly wants a rebrand:
+Protect this unless the user explicitly wants a rebrand:
 
-- Tone is confident, sparse, and stylized, not corporate.
+- Tone is sparse, confident, stylized, and world-built, not corporate.
 - The archive framing matters more than generic ecommerce language.
-- "Limited", "archive", "drop", "enter the mugen", and "no restocks" are core vocabulary.
-- The visual language is deliberate and dramatic, especially on `/archive`.
-- The site identity is rooted in The Gambia + Tokyo/Shibuya/Neo-Tokyo references.
-- Avoid turning the experience into a bland template storefront.
+- Core vocabulary includes: `archive`, `drop`, `limited`, `no restocks`, `enter the mugen`.
+- The identity is rooted in The Gambia + Tokyo / Shibuya / Neo-Tokyo references.
+- The landing page should not feel like a generic template storefront.
+- `/archive` is meant to feel dramatic and intentional, not like a simple category grid.
 
-## Product Catalog Model
+Current landing-page canon:
 
-Primary catalog logic lives in [src/lib/products.ts](/Users/qtv/drip-store/src/lib/products.ts).
+- Hero kicker: `ARCHIVE DROP 001`
+- Hero title: `MUGEN DISTRICT`
+- Hero subcopy: `Unlimited territory. An underground archive born in The Gambia, refined in the streets of Tokyo. Infinite energy—Zero limits.`
+- Archive section note: `Drop 001 — Five pieces. Three limited. No restocks.`
+- Footer manifesto frames the brand as the intersection of West African grit and Neo-Tokyo aesthetics, established 2026
 
-Key facts:
+## Current Product Canon
 
-- There is a base in-repo product catalog (`ALL_PRODUCTS` / base product objects).
-- Supabase inventory can override title, price, limited flag, stock, and sold counts.
-- Product images prefer Supabase Storage when `NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL` or Supabase URL is available.
-- Local fallback images live under `/archive/assets/products`.
-- Limited items default to a stock model centered around `LIMITED_STOCK_QTY = 10`.
-- Product pages and grids use live merged inventory from [src/lib/products-server.ts](/Users/qtv/drip-store/src/lib/products-server.ts).
+Source of truth:
 
-Current archive messaging on the landing page says:
+- [src/lib/products.ts](/Users/qtv/drip-store/src/lib/products.ts)
+- [src/lib/products-server.ts](/Users/qtv/drip-store/src/lib/products-server.ts)
 
-- `ARCHIVE DROP 001`
-- `Drop 001 — Five pieces. Three limited. No restocks.`
+There are currently 5 base catalog products:
 
-Treat that as user-facing canon unless the user asks to change it.
+- `luffy-02` — `Gear 5 Luffy Collage Tee (Black)` — GMD 1500 — new — not limited
+- `luffy-01` — `One Piece Legacy Panel Tee (Black)` — GMD 2000 — limited
+- `ichigo-01` — `Ichigo Hollow Grunge Tee (White Distressed)` — GMD 2000 — new — limited
+- `ulquiorra-01` — `Ulquiorra Segunda Etapa Tee (Black)` — GMD 2000 — limited
+- `ichigo-02` — `Tensa Zangetsu Fragment Tee (White Distressed)` — GMD 1500 — not limited
+
+Catalog model facts:
+
+- Base catalog lives in repo as `BASE_PRODUCTS` / `ALL_PRODUCTS`.
+- Supabase inventory can override title, price, limited flag, stock, sold count, and availability.
+- Product images prefer Supabase Storage when configured.
+- Local fallback images live in `public/archive/assets/products`.
+- `LIMITED_STOCK_QTY` is currently `10`.
+- `NEW_PRODUCTS` and `LIMITED_PRODUCTS` are derived from the base catalog.
+
+Important product behavior:
+
+- Limited items show scarcity messaging.
+- Before launch, limited items should show stock framing without appearing sold out.
+- After launch, limited items can show `Only X left`, `Final piece`, or `SOLD OUT`.
+- Product pages pull live inventory when possible, but can fall back to local catalog definitions.
 
 ## Launch Gate Logic
-
-Launch behavior is important and has been refined multiple times.
 
 Source of truth:
 
@@ -87,19 +108,92 @@ Source of truth:
 - [src/hooks/useLaunchLive.ts](/Users/qtv/drip-store/src/hooks/useLaunchLive.ts)
 - [src/components/TrustedNowProvider.tsx](/Users/qtv/drip-store/src/components/TrustedNowProvider.tsx)
 - [src/app/api/now/route.ts](/Users/qtv/drip-store/src/app/api/now/route.ts)
+- [src/lib/launch-copy.ts](/Users/qtv/drip-store/src/lib/launch-copy.ts)
 
 Rules:
 
 - Launch date defaults to April 30 UTC of the current year if no env override is set.
-- `NEXT_PUBLIC_LAUNCH_AT` / `LAUNCH_AT` can set the launch date.
-- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE` / `FORCE_LAUNCH_LIVE` can force the store live.
-- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE_UNTIL` / `FORCE_LAUNCH_LIVE_UNTIL` can temporarily override launch lock.
-- Limited product UI should show stock messaging before launch without falsely marking products sold out.
-- Cross-device launch consistency matters. The app now syncs against trusted server time instead of relying purely on the client clock.
+- `NEXT_PUBLIC_LAUNCH_AT` / `LAUNCH_AT` can override the launch date.
+- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE` / `FORCE_LAUNCH_LIVE` can force launch live.
+- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE_UNTIL` / `FORCE_LAUNCH_LIVE_UNTIL` can force launch live until a specific date.
+- Cross-device launch consistency matters; trusted server time is used to avoid client-clock drift problems.
 
-Do not casually rewrite launch logic. It was explicitly fixed on April 1, 2026 to avoid lock-state mismatches across devices.
+Current launch copy constants:
 
-## Cart And Checkout
+- Launch day text: `April 30`
+- Locked button text: `LOCKED — Opens April 30`
+- Locked stock note: `Opens April 30 (00:00)`
+- Locked stock fallback: `DROPS APRIL 30`
+- Locked promo text: `DROP LOCKED • OPENS APRIL 30 • LIMITED QTY • NO RESTOCKS`
+- Live promo text: `DROP LIVE • SHIPS IN 24–48H • NO RESTOCKS`
+
+Do not casually rewrite launch logic. It was explicitly hardened on April 1, 2026 to prevent mismatch across devices.
+
+## Route Behavior Details
+
+### `/archive`
+
+- Real homepage / landing experience
+- Uses `LaunchCountdown`
+- Renders the full product grid
+- Includes newsletter signup, social links, ticker, manifesto, and legal links
+
+### `/store`
+
+- Shows all live products
+- Has client-side search by name or SKU
+- Shows `GET DROP ALERT` button before launch
+- Opens `WaitlistModal` with `source="store"` when launch is locked
+
+### `/limited`
+
+- Shows only products where `isLimited === true`
+
+### `/new`
+
+- Shows only products where `isNew === true`
+
+### `/product/[id]`
+
+- Product detail page with live product lookup and fallback lookup
+- Metadata is generated from the product data
+- Related products are computed from category / limited affinity
+- Prelaunch state can show countdown and waitlist behavior
+- Add-to-cart is blocked before launch using launch lock copy
+
+### `/cart`
+
+- Client-side cart page
+- Cart state syncs across tabs with storage/custom events
+
+### `/checkout`
+
+- Requires cart items
+- Collects `name`, `email`, `phone`, address fields, `country`, and optional `deliveryNote`
+- Default country is `The Gambia`
+- Uses idempotency keys for order creation
+- Blocks submission when launch is locked
+- Blocks submission when limited stock changed or sold out
+
+### `/success`
+
+- Shows `ORDER ARCHIVED`
+- Displays order reference
+- Tells user manual payment will follow
+- Provides WhatsApp confirmation button
+- Provides copy-details action
+- Provides call button on mobile
+- Business contact currently uses WhatsApp / phone number `+2203340558`
+
+### `/admin/orders`
+
+- Shows latest 20 orders
+- Requires valid admin session
+- Uses CSRF-protected forms for actions
+- Supports confirm, cancel, and delete
+- Completed orders are locked from confirm/cancel and should be deleted instead if needed
+
+## Cart And Order Submission
 
 Main files:
 
@@ -110,20 +204,60 @@ Main files:
 - [src/lib/order-success.ts](/Users/qtv/drip-store/src/lib/order-success.ts)
 - [src/lib/whatsapp.ts](/Users/qtv/drip-store/src/lib/whatsapp.ts)
 
-Behavior:
+Important behavior:
 
-- Cart state is client-side and syncs across tabs with storage/custom events.
-- Checkout sanitizes shipping fields on the client and server.
-- The order create route validates prices and products from Supabase, not just from client payloads.
-- The order create route rate-limits requests.
-- The route is designed so order creation can still succeed even if email delivery fails.
-- Success state stores and displays an order reference like `MGN-XXXXXXXX`.
-- Success page encourages WhatsApp confirmation and also exposes a call action on mobile.
+- Cart is local/client-side state.
+- Cart sync uses browser storage + custom events.
+- Checkout sanitizes all shipping fields on both client and server.
+- Order creation validates against Supabase product data, not only client payloads.
+- Order creation is rate-limited.
+- Order creation uses idempotency keys and can reuse an existing order for the same key.
+- Limited inventory is enforced server-side.
+- Order references are derived in the `MGN-XXXXXXXX` pattern.
+- Successful order placement clears the cart and writes a local order-success summary.
 
-Important operational truth:
+## API Surface
 
-- This is a manual fulfillment flow, not a card payment flow.
-- Preserve the WhatsApp/manual follow-up pattern unless the user asks to replace it.
+### `POST /api/orders/create`
+
+- Real order endpoint
+- Node runtime
+- Rate limit: 8 requests per 10 minutes, 15-minute block
+- Validates products from Supabase
+- Inserts order and order items
+- Attempts customer and admin email
+- Handles existing orders by idempotency key
+- Returns `order_id`, `order_ref`, and email status fields
+
+### `POST /api/newsletter`
+
+- Persists email into `public.waitlist` with `source='newsletter'`
+- Duplicate signups are treated as success
+- Sends admin notification best-effort
+- Sends customer confirmation best-effort
+- Handles Resend test-mode restrictions explicitly
+- Rate limit: 5 requests per 10 minutes, 15-minute block
+
+### `POST /api/waitlist`
+
+- Used for prelaunch/drop-alert signup from store or product flows
+- Allowed sources are only `store` and `product`
+- Accepts optional `productSku`
+- Duplicate signups are treated as success
+- Rate limit: 5 requests per 60 seconds, 5-minute block
+
+### `POST /api/checkout`
+
+- Deprecated on purpose
+- Returns `410`
+- Do not revive as the primary checkout path unless the user asks for an architecture change
+
+### Debug routes
+
+- `/api/debug`
+- `/api/debug/email`
+
+These must stay disabled in production unless explicitly enabled.
 
 ## Email And Notifications
 
@@ -134,38 +268,36 @@ Main files:
 - [src/lib/orders/email-state.ts](/Users/qtv/drip-store/src/lib/orders/email-state.ts)
 - [src/app/api/newsletter/route.ts](/Users/qtv/drip-store/src/app/api/newsletter/route.ts)
 
-Current behavior:
+Operational truths:
 
-- Resend is used for transactional email.
-- Order creation can send admin and customer messages.
-- Email status is tracked and normalized.
-- Customer email failure should not block order creation.
-- Newsletter signups persist first, then try best-effort emails.
-- Resend testing restrictions were explicitly handled in the order/newsletter flows.
-
-Important:
-
+- Resend is the mail provider.
 - `RESEND_FROM_EMAIL` must be a verified sender.
-- Debug routes must stay disabled in production unless explicitly enabled.
+- `RESEND_CUSTOMER_FROM_EMAIL` is optional and falls back to `RESEND_FROM_EMAIL`.
+- `RESEND_REPLY_TO` is used as support/unsubscribe contact when applicable.
+- Order creation can send both admin and customer mail.
+- Newsletter signup can send both admin and customer mail.
+- Customer email failure should not block order creation.
+- Resend testing restrictions were explicitly handled in the code.
+- Email delivery state is tracked and normalized.
 
 ## Waitlist And Newsletter
 
-There are two related but separate collection flows:
+These flows are related but separate:
 
 - Newsletter:
-  - Route: [src/app/api/newsletter/route.ts](/Users/qtv/drip-store/src/app/api/newsletter/route.ts)
-  - Persists into `public.waitlist` with `source='newsletter'`
-  - Sends best-effort admin/customer emails
+  - route: `/api/newsletter`
+  - persists to `waitlist` with `source='newsletter'`
+  - best-effort email notifications after persistence
 
 - Waitlist:
-  - Route: [src/app/api/waitlist/route.ts](/Users/qtv/drip-store/src/app/api/waitlist/route.ts)
-  - Used for pre-launch/drop-alert capture from store/product contexts
-  - Allowed sources are currently `store` and `product`
-  - Persists contact + optional `product_sku`
+  - route: `/api/waitlist`
+  - used for prelaunch store/product drop alerts
+  - allowed sources are `store` and `product`
+  - persists contact plus optional `product_sku`
 
-Both flows are rate-limited and treat duplicate entries as success.
+Both are rate-limited and duplicates are treated as success.
 
-## Admin Flow
+## Admin Auth Model
 
 Main files:
 
@@ -182,48 +314,122 @@ Current model:
 - Email + PBKDF2-SHA256 password hash
 - Signed session cookie
 - CSRF protection for admin actions
-- Admin orders page shows latest 20 orders
-- Admin can confirm, cancel, or delete orders
-- Completed orders are locked from confirm/cancel and should be deleted instead if needed
-- Auth is fail-closed when required env vars are missing
+- Fail-closed behavior when required env vars are missing
 
 ## Supabase Expectations
 
-This repo assumes Supabase is the backend source for:
+Supabase is the backend source for:
 
 - `products`
 - `orders`
 - `order_items`
 - `waitlist`
 
-The app also assumes RPC/database support for the order insertion flow.
+Production expectations:
 
-Read [README.md](/Users/qtv/drip-store/README.md) for the migration list and env setup.
+- Product validation and live inventory depend on Supabase
+- Manual order insertion expects DB / RPC support matching the migrations
+- The app can fall back in some product-display cases, but production behavior expects Supabase to be configured correctly
 
-Important implementation pattern:
+Run migrations from `supabase/migrations/` in order, as documented in [README.md](/Users/qtv/drip-store/README.md).
 
-- The app can fall back gracefully when Supabase inventory snapshots are unavailable.
-- But production behavior expects Supabase to be correctly configured.
+Important recent migration expectations include:
 
-## Environment And Security Notes
+- manual orders schema
+- catalog alignment / seed data
+- waitlist tables + public insert policy
+- customer order email state
+- security hardening
+- limited inventory quantity update to 10
 
-Read the root README before touching deployment or auth.
+## SEO / Site Meta
 
-High-sensitivity env/config areas:
+Main file:
 
-- Supabase URL and keys
+- [src/lib/site.ts](/Users/qtv/drip-store/src/lib/site.ts)
+
+Current constants:
+
+- `SITE_NAME = "MUGEN DISTRICT"`
+- `SITE_DESCRIPTION = "Anime streetwear from Mugen District. Limited archive pieces, no restocks, and Tokyo-grunge energy built for the drop."`
+- `SITE_OG_IMAGE = "/archive/assets/hero-bg.jpg"`
+
+Site URL resolution prefers:
+
+1. `NEXT_PUBLIC_SITE_URL`
+2. `SITE_URL`
+3. `VERCEL_PROJECT_PRODUCTION_URL`
+4. fallback `https://mugendistrict.com`
+
+## Analytics
+
+Main file:
+
+- [src/lib/analytics.ts](/Users/qtv/drip-store/src/lib/analytics.ts)
+
+Current analytics is lightweight and event-based.
+
+Tracked event names:
+
+- `view_product`
+- `add_to_cart`
+- `begin_checkout`
+- `order_submitted`
+
+It currently dispatches `window` custom events and logs to console. There is no heavy analytics vendor integration in this code path.
+
+## Environment Variables
+
+Required / important env vars from current setup:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `RESEND_CUSTOMER_FROM_EMAIL`
+- `RESEND_REPLY_TO`
+- `RESEND_FROM_NAME`
+- `ADMIN_ORDER_EMAIL`
+- `EMAIL_DEBUG`
+- `ENABLE_DEBUG_ROUTES`
+- `ADMIN_LOGIN_EMAIL`
+- `ADMIN_PASSWORD_HASH`
+- `ADMIN_SESSION_SECRET`
+
+Launch-sensitive env vars:
+
+- `NEXT_PUBLIC_LAUNCH_AT`
+- `LAUNCH_AT`
+- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE`
+- `FORCE_LAUNCH_LIVE`
+- `NEXT_PUBLIC_FORCE_LAUNCH_LIVE_UNTIL`
+- `FORCE_LAUNCH_LIVE_UNTIL`
+
+Optional image / site env vars that influence behavior:
+
+- `NEXT_PUBLIC_PRODUCT_IMAGE_BASE_URL`
+- `NEXT_PUBLIC_SITE_URL`
+- `SITE_URL`
+
+## Security Notes
+
+High-sensitivity areas:
+
+- Supabase URL / keys
 - Resend API key and sender config
 - `ADMIN_LOGIN_EMAIL`
 - `ADMIN_PASSWORD_HASH`
 - `ADMIN_SESSION_SECRET`
 - launch override env vars
 
-Important safety rules already encoded in the project:
+Safety rules already encoded in the project:
 
 - Admin auth fails closed when env is incomplete.
 - Debug routes are disabled in production by default.
 - Secret leakage should be treated as credential compromise and rotated.
-- Website DNS and email DNS are intentionally documented separately.
+- Website DNS and email DNS are intentionally documented separately in the README.
 
 ## Commands
 
@@ -234,36 +440,52 @@ Important safety rules already encoded in the project:
 - Lint: `npm run lint`
 - Tests: `npm test`
 - Generate admin password hash: `npm run admin:hash`
+- Playwright install: `npm run playwright:install`
+- Playwright test: `npm run playwright:test`
+
+## Tests / Verification Coverage
+
+Current repo test coverage includes:
+
+- email send logic
+- email templates
+- email-state normalization
+- launch parsing / launch logic
+- input sanitization
+- product image helpers
+
+Playwright also exists in the repo with at least one mobile-oriented spec:
+
+- `tests/mobile-spot.spec.ts`
 
 ## Recent Timeline
 
-This timeline is based on git history plus current code. Many commits are named `update site`, so when intent was unclear, this summary is inferred from the resulting code.
+This is inferred from the repo, README, migrations, and current code:
 
 - 2026-02-24: Bootstrapped from Create Next App.
-- 2026-02-25: The repo became `drip-store`, with the first real store/cart/checkout/product pages and supporting components.
-- 2026-02-25: Home was changed to redirect away from a generic landing page toward the shopping experience.
-- 2026-02-25: Archive/product/cart routing issues were fixed.
-- 2026-02-27: Resend test-mode behavior and success redirect logic were fixed so manual order confirmation worked more reliably.
-- 2026-03-01: Supabase checkout RPC support was repaired/enabled for the order flow.
-- 2026-03-01: Legal pages (`/privacy`, `/refunds`, `/terms`) and reusable legal links were added.
-- 2026-03-01: Brand favicon/icons replaced the default app favicon.
-- 2026-03-11: Mobile navbar spacing was fixed.
-- 2026-04-01: Launch lock state was fixed across devices by introducing trusted server time synchronization and stronger launch-date parsing/tests.
-- 2026-04-14: Launch readiness/admin flow polish landed, including major `globals.css` styling work, product image handling cleanup, and product image tests.
+- 2026-02-25: Repo became the early storefront with store/cart/checkout/product flows.
+- 2026-02-25: Home began redirecting toward the shopping/archive experience.
+- 2026-02-27: Resend test-mode behavior and success redirect logic were improved.
+- 2026-03-01: Supabase-backed manual-order checkout flow and supporting migrations were expanded.
+- 2026-03-01: Legal pages and reusable legal links were added.
+- 2026-03-11: Security / abuse hardening migrations landed.
+- 2026-03-24: Limited inventory quantity was aligned to 10 and security hardening continued.
+- 2026-04-01: Launch lock state was fixed across devices using trusted server time and better launch parsing.
+- 2026-04-14: Product image handling, UI polish, and related tests were improved.
 
 ## Working Agreements For Future Changes
 
-When editing this repo, keep these truths intact unless the user asks otherwise:
+Keep these truths intact unless the user explicitly asks otherwise:
 
 - Preserve the Mugen District voice and world-building.
 - Do not replace the archive-led landing experience with a generic ecommerce hero.
-- Do not assume automated card payments exist.
-- Do not reintroduce `POST /api/checkout` as the primary order path unless the user explicitly wants that architecture.
+- Do not assume card payments currently exist.
+- Do not reintroduce `POST /api/checkout` as the primary order path unless requested.
 - Do not break launch gating or trusted-time sync.
-- Do not make limited items look sold out before launch unless that is intended.
-- Do not make email delivery a hard dependency for order creation success.
+- Do not make limited items look sold out before launch unless that is the intended change.
+- Do not make email delivery a hard dependency for order creation.
 - Do not weaken admin auth, CSRF, or secret handling.
-- Prefer reading current code over assuming older commit intent, because many commit messages are generic.
+- Prefer reading current code over assuming older commit intent.
 
 ## Best Entry Points For New Work
 
@@ -280,10 +502,9 @@ If you need to understand the app quickly, start here:
 
 ## If More History Is Needed
 
-This file captures the current state and the clearest milestones.
-For finer-grained archaeology, inspect:
+This file captures the current operating reality.
+For finer-grained archaeology, inspect git history directly:
 
 - `git log --reverse --date=short --pretty=format:'%ad %h %s'`
-- milestone commits like `30b4190`, `274ed1c`, `a749111`, `cdbd7de`
 
-Because many historical commits are labeled `update site`, exact intent sometimes has to be inferred from the final code and migration history rather than commit messages alone.
+Because many historical commits are labeled `update site`, exact past intent is sometimes less reliable than the current code, migrations, and README.

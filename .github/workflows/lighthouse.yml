@@ -1,0 +1,25 @@
+name: Lighthouse CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  lhci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Start server
+        run: |
+          nohup npm run start &
+          sleep 6
+      - name: Run LHCI
+        run: npx lhci autorun --collect.url=http://localhost:3000

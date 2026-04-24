@@ -31,11 +31,28 @@ const nextConfig: NextConfig = {
       : [],
   },
   async headers() {
+    const supabaseStorageHost = supabaseHost || "";
+    const supabaseCspHost = supabaseStorageHost ? `https://${supabaseStorageHost}` : "";
+    const imgSrc = ["'self'", "data:", supabaseCspHost].filter(Boolean).join(" ");
+    const connectSrc = ["'self'", supabaseCspHost, "https://api.resend.com"].filter(Boolean).join(" ");
+
     const securityHeaders = [
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "X-Frame-Options", value: "DENY" },
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      {
+        key: "Content-Security-Policy",
+        value: [
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+          "style-src 'self' 'unsafe-inline'",
+          `img-src ${imgSrc}`,
+          `connect-src ${connectSrc}`,
+          "font-src 'self'",
+          "frame-ancestors 'none'",
+        ].join("; "),
+      },
     ];
 
     if (isProduction) {

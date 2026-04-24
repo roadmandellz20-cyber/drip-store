@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
@@ -10,6 +9,7 @@ import {
 } from "@/lib/admin-auth";
 import { sanitizeSingleLineInput } from "@/lib/input";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import OrdersClient, { type AdminOrder } from "./OrdersClient";
 
 export const metadata: Metadata = {
   title: "Admin Orders",
@@ -19,34 +19,15 @@ export const metadata: Metadata = {
   },
 };
 
-function asString(value: unknown) {
-  return sanitizeSingleLineInput(value);
-}
-
-function formatAmount(cents: number, currency: string) {
-  return `${currency.toUpperCase()} ${Math.round(cents / 100).toLocaleString()}`;
-}
-
-function normalizeStatus(value: unknown) {
-  return sanitizeSingleLineInput(value, { lowercase: true });
-}
-
-function getStatusClass(status: string) {
-  if (status === "confirmed") return "order-status order-status--confirmed";
-  if (status === "cancelled") return "order-status order-status--cancelled";
-  if (status === "completed") return "order-status order-status--completed";
-  return "order-status";
-}
-
 function getStateMessage(state?: string) {
-  if (state === "confirmed") return { tone: "ok", text: "Order confirmed." };
-  if (state === "cancelled") return { tone: "ok", text: "Order cancelled." };
-  if (state === "deleted") return { tone: "ok", text: "Order deleted." };
-  if (state === "locked") return { tone: "error", text: "Completed orders are locked. Delete them instead." };
-  if (state === "missing") return { tone: "error", text: "Order not found." };
-  if (state === "invalid") return { tone: "error", text: "Invalid admin action." };
-  if (state === "csrf") return { tone: "error", text: "Security check failed. Try again." };
-  if (state === "error") return { tone: "error", text: "Admin action failed." };
+  if (state === "confirmed") return { tone: "ok" as const, text: "Order confirmed." };
+  if (state === "cancelled") return { tone: "ok" as const, text: "Order cancelled." };
+  if (state === "deleted") return { tone: "ok" as const, text: "Order deleted." };
+  if (state === "locked") return { tone: "error" as const, text: "Completed orders are locked. Delete them instead." };
+  if (state === "missing") return { tone: "error" as const, text: "Order not found." };
+  if (state === "invalid") return { tone: "error" as const, text: "Invalid admin action." };
+  if (state === "csrf") return { tone: "error" as const, text: "Security check failed. Try again." };
+  if (state === "error") return { tone: "error" as const, text: "Admin action failed." };
   return null;
 }
 
@@ -67,25 +48,34 @@ export default async function AdminOrdersPage({
     redirect("/admin/login?redirect=/admin/orders");
   }
 
-  const query = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("orders")
     .select("id,order_number,customer_name,customer_email,total_cents,currency,email_status,created_at,status")
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .order("created_at", { ascending: false });
 
-  const rows = (query.data as Array<Record<string, unknown>> | null) || [];
+  const orders: AdminOrder[] = ((data as Array<Record<string, unknown>> | null) ?? []).map((row) => ({
+    id: sanitizeSingleLineInput(row.id),
+    order_number: sanitizeSingleLineInput(row.order_number) || "(pending)",
+    customer_name: sanitizeSingleLineInput(row.customer_name) || "—",
+    customer_email: sanitizeSingleLineInput(row.customer_email) || "—",
+    total_cents: typeof row.total_cents === "number" ? row.total_cents : 0,
+    currency: sanitizeSingleLineInput(row.currency) || "GMD",
+    status: sanitizeSingleLineInput(row.status, { lowercase: true }) || "pending",
+    email_status: sanitizeSingleLineInput(row.email_status) || "—",
+    created_at: sanitizeSingleLineInput(row.created_at),
+  }));
+
   const stateMessage = getStateMessage(
-    sanitizeSingleLineInput(resolvedSearchParams.state, {
-      lowercase: true,
-      maxLength: 32,
-    })
+    sanitizeSingleLineInput(resolvedSearchParams.state, { lowercase: true, maxLength: 32 })
   );
 
   return (
-    <main className="page page--admin-wide">
+    <div className="page page--admin-wide">
       <div className="page__head">
-        <h1 className="page__title">ADMIN ORDERS</h1>
-        <p className="page__sub">Last 20 orders (debug view).</p>
+        <h1 className="page__title">ORDERS</h1>
+        <p className="page__sub">
+          {error ? "Error loading orders." : `${orders.length} order${orders.length !== 1 ? "s" : ""} total.`}
+        </p>
         <div className="page__actions">
           <form action="/api/admin/logout" method="post">
             <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
@@ -96,77 +86,11 @@ export default async function AdminOrdersPage({
         </div>
       </div>
 
-      {stateMessage ? (
-        <div className={stateMessage.tone === "error" ? "checkout__error" : "checkout__note"}>
-          {stateMessage.text}
-        </div>
-      ) : null}
-
-      {query.error ? (
-        <div className="checkout__error">Unable to load orders right now.</div>
-      ) : rows.length === 0 ? (
-        <div className="checkout__note">No orders found.</div>
+      {error ? (
+        <div className="checkout__error">Unable to load orders: {error.message}</div>
       ) : (
-        <div className="checkout__list">
-          {rows.map((row) => {
-            const id = asString(row.id);
-            const orderNumber = asString(row.order_number) || "(pending)";
-            const name = asString(row.customer_name) || "Unknown";
-            const email = asString(row.customer_email) || "-";
-            const currency = asString(row.currency) || "GMD";
-            const total = Number(row.total_cents) || 0;
-            const emailStatus = asString(row.email_status) || "-";
-            const createdAt = asString(row.created_at);
-            const status = normalizeStatus(row.status) || "pending";
-            const canConfirm = status !== "confirmed" && status !== "completed";
-            const canCancel = status !== "cancelled" && status !== "completed";
-            const canDelete = true;
-
-            return (
-              <article key={id} className="checkout__item checkout__item--stacked">
-                <div className="checkout__row checkout__row--space-between">
-                  <strong>{orderNumber}</strong>
-                  <span>{formatAmount(total, currency)}</span>
-                </div>
-                <div className="checkout__row">
-                  {name} • {email}
-                </div>
-                <div className="checkout__row">
-                  status: <strong className={getStatusClass(status)}>{status}</strong>
-                </div>
-                <div className="checkout__row">email_status: {emailStatus}</div>
-                <div className="checkout__row">created_at: {createdAt || "-"}</div>
-                <div className="checkout__row checkout__row--admin-actions">
-                  <Link className="btn btn--ghost" href={`/success?order_id=${encodeURIComponent(id)}`}>
-                    VIEW
-                  </Link>
-                  <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
-                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
-                    <input type="hidden" name="action" value="confirm" />
-                    <button className="btn btn--primary" type="submit" disabled={!canConfirm}>
-                      CONFIRM
-                    </button>
-                  </form>
-                  <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
-                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
-                    <input type="hidden" name="action" value="cancel" />
-                    <button className="btn btn--ghost" type="submit" disabled={!canCancel}>
-                      CANCEL
-                    </button>
-                  </form>
-                  <form action={`/api/admin/orders/${encodeURIComponent(id)}`} method="post">
-                    <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
-                    <input type="hidden" name="action" value="delete" />
-                    <button className="btn btn--ghost btn--danger" type="submit" disabled={!canDelete}>
-                      DELETE
-                    </button>
-                  </form>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <OrdersClient orders={orders} csrfToken={csrfToken} stateMessage={stateMessage} />
       )}
-    </main>
+    </div>
   );
 }
