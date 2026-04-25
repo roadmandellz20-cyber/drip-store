@@ -1,0 +1,22 @@
+{
+  "firewall": {
+    "rules": [
+      {
+        "name": "Allow Telegram Webhooks",
+        "description": "Allow Telegram server IPs to reach the webhook route",
+        "conditionGroup": [
+          {
+            "conditions": [
+              {
+                "op": "pre",
+                "type": "path",
+                "value": "/api/telegram/webhook"
+              }
+            ]
+          }
+        ],
+        "action": "allow"
+      }
+    ]
+  }
+}
