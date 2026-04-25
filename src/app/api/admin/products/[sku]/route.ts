@@ -54,15 +54,14 @@ export async function PATCH(
   }
 
   const payload = parsed.value;
+  // Only update canonical columns — do not include legacy alias columns (tagline,
+  // image_main, image_alt) that may not exist in all environments.
   const updates = {
     title: payload.title,
     description: payload.description,
     details: payload.details,
     brand_line: payload.brand_line,
-    tagline: payload.brand_line,
     image_url: payload.image_url,
-    image_main: payload.image_url,
-    image_alt: payload.image_url,
     price_cents: payload.price_cents,
     currency: payload.currency,
     status: payload.status,
@@ -80,9 +79,17 @@ export async function PATCH(
     .select("*")
     .maybeSingle();
 
-  if (result.error || !result.data) {
-    console.error("[admin/products] update error", result.error?.message);
-    return NextResponse.json({ error: "Update failed." }, { status: 500 });
+  if (result.error) {
+    console.error("[admin/products] Supabase update error:", result.error);
+    return NextResponse.json(
+      { error: result.error.message || "Database update failed." },
+      { status: 500 }
+    );
+  }
+
+  if (!result.data) {
+    console.error("[admin/products] update returned no row for slug:", slug);
+    return NextResponse.json({ error: "Product not found after update." }, { status: 404 });
   }
 
   return NextResponse.json({

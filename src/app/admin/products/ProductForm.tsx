@@ -113,7 +113,8 @@ export default function ProductForm({
       };
 
       if (!response.ok || data.ok !== true || !data.product) {
-        throw new Error(data.error || "Save failed.");
+        // Prefer the server's specific error message; fall back to HTTP status
+        throw new Error(data.error || `Request failed (${response.status}).`);
       }
 
       setForm(toInitialState(data.product));
