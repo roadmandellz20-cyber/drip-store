@@ -17,10 +17,12 @@ export default async function NewAdminProductPage() {
   }
 
   return (
-    <div className="page page--admin-wide">
-      <div className="page__head">
-        <h1 className="page__title">NEW PRODUCT</h1>
-        <p className="page__sub">Create a live catalog product without touching code.</p>
+    <div className="admin-page">
+      <div className="admin-page__head">
+        <div>
+          <h1 className="admin-page__title">NEW PRODUCT</h1>
+          <p className="admin-page__sub">Create a live catalog product without touching code.</p>
+        </div>
       </div>
 
       <ProductForm mode="create" />

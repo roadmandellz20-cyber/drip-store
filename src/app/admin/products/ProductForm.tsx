@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  detailsToTextarea,
-  type AdminProduct,
-  type AdminProductStatus,
-} from "@/lib/admin-products";
+import { detailsToTextarea, type AdminProduct, type AdminProductStatus } from "@/lib/admin-products";
 
 const STATUS_OPTIONS: AdminProductStatus[] = ["AVAILABLE", "LIMITED", "ARCHIVED"];
 
@@ -105,9 +101,7 @@ export default function ProductForm({
           : `/api/admin/products/${encodeURIComponent(product?.slug || form.slug)}`,
         {
           method: mode === "create" ? "POST" : "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
@@ -141,202 +135,192 @@ export default function ProductForm({
   }
 
   return (
-    <div className="panel">
-      <div className="panel__line" />
-      <div className="panel__body">
-        <form className="checkout-form" onSubmit={onSubmit}>
-          <div className="checkout-form__row2">
-            <label className="checkout-form__field">
-              <span>SKU / SLUG</span>
-              <input
-                value={form.slug}
-                onChange={(event) => setForm((prev) => ({ ...prev, slug: event.target.value }))}
-                disabled={mode === "edit"}
-                required
-              />
-            </label>
-
-            <label className="checkout-form__field">
-              <span>SORT ORDER</span>
-              <input
-                type="number"
-                value={form.sort_order}
-                onChange={(event) => setForm((prev) => ({ ...prev, sort_order: event.target.value }))}
-              />
-            </label>
-          </div>
-
-          <label className="checkout-form__field">
-            <span>TITLE</span>
-            <input
-              value={form.title}
-              onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-              required
-            />
-          </label>
-
-          <div className="checkout-form__row2">
-            <label className="checkout-form__field">
-              <span>PRICE (GMD)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.price}
-                onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-                required
-              />
-            </label>
-
-            <label className="checkout-form__field">
-              <span>STATUS</span>
-              <select
-                value={form.status}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    status: event.target.value as AdminProductStatus,
-                    is_limited:
-                      event.target.value === "ARCHIVED"
-                        ? false
-                        : event.target.value === "LIMITED"
-                          ? true
-                          : false,
-                  }))
-                }
-              >
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="checkout-form__field">
-            <span>IMAGE URL</span>
-            <input
-              value={form.image_url}
-              onChange={(event) => setForm((prev) => ({ ...prev, image_url: event.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="checkout-form__field">
-            <span>DESCRIPTION</span>
-            <textarea
-              rows={8}
-              value={form.description}
-              onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-            />
-          </label>
-
-          <label className="checkout-form__field">
-            <span>DETAIL BULLETS</span>
-            <textarea
-              rows={6}
-              value={form.details}
-              onChange={(event) => setForm((prev) => ({ ...prev, details: event.target.value }))}
-              placeholder={"One detail per line"}
-            />
-          </label>
-
-          <label className="checkout-form__field">
-            <span>BRAND LINE</span>
-            <input
-              value={form.brand_line}
-              onChange={(event) => setForm((prev) => ({ ...prev, brand_line: event.target.value }))}
-            />
-          </label>
-
-          <div
-            style={{
-              display: "grid",
-              gap: "16px",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              marginBottom: "18px",
-            }}
-          >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                fontFamily: "var(--mono)",
-                fontSize: "12px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={form.is_new}
-                onChange={(event) => setForm((prev) => ({ ...prev, is_new: event.target.checked }))}
-              />
-              MARK AS NEW
-            </label>
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                fontFamily: "var(--mono)",
-                fontSize: "12px",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={form.is_limited}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    is_limited: event.target.checked,
-                    status:
-                      prev.status === "ARCHIVED"
-                        ? "ARCHIVED"
-                        : event.target.checked
-                          ? "LIMITED"
-                          : "AVAILABLE",
-                  }))
-                }
-              />
-              LIMITED PRODUCT
-            </label>
-
-            <label className="checkout-form__field" style={{ marginBottom: 0 }}>
-              <span>STOCK QTY</span>
-              <input
-                type="number"
-                min="0"
-                value={form.stock_qty}
-                onChange={(event) => setForm((prev) => ({ ...prev, stock_qty: event.target.value }))}
-                disabled={!form.is_limited || form.status === "ARCHIVED"}
-                placeholder={form.is_limited ? "0" : "Not used"}
-              />
-            </label>
-          </div>
-
-          {result ? (
-            <div className={result.tone === "error" ? "checkout__error" : "checkout__note"}>
-              {result.text}
-            </div>
-          ) : null}
-
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-            <button className="btn btn--primary" type="submit" disabled={submitting}>
-              {submitting ? "SAVING..." : mode === "create" ? "CREATE PRODUCT" : "SAVE PRODUCT"}
-            </button>
-            <button
-              className="btn btn--ghost"
-              type="button"
-              onClick={() => router.push("/admin/products")}
-              disabled={submitting}
-            >
-              BACK TO PRODUCTS
-            </button>
-          </div>
-        </form>
+    <form className="admin-form" onSubmit={onSubmit}>
+      {/* Identity */}
+      <div className="admin-form__row2">
+        <div className="admin-form__field">
+          <label className="admin-form__label">SKU / SLUG</label>
+          <input
+            className="admin-form__input"
+            value={form.slug}
+            onChange={(e) => setForm((prev) => ({ ...prev, slug: e.target.value }))}
+            disabled={mode === "edit"}
+            required
+          />
+        </div>
+        <div className="admin-form__field">
+          <label className="admin-form__label">SORT ORDER</label>
+          <input
+            className="admin-form__input"
+            type="number"
+            value={form.sort_order}
+            onChange={(e) => setForm((prev) => ({ ...prev, sort_order: e.target.value }))}
+          />
+        </div>
       </div>
-    </div>
+
+      <div className="admin-form__field">
+        <label className="admin-form__label">TITLE</label>
+        <input
+          className="admin-form__input"
+          value={form.title}
+          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+          required
+        />
+      </div>
+
+      {/* Pricing + Status */}
+      <div className="admin-form__section">
+        <div className="admin-form__row2">
+          <div className="admin-form__field">
+            <label className="admin-form__label">PRICE (GMD)</label>
+            <input
+              className="admin-form__input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.price}
+              onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="admin-form__field">
+            <label className="admin-form__label">STATUS</label>
+            <select
+              className="admin-form__select"
+              value={form.status}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  status: e.target.value as AdminProductStatus,
+                  is_limited:
+                    e.target.value === "ARCHIVED"
+                      ? false
+                      : e.target.value === "LIMITED"
+                        ? true
+                        : false,
+                }))
+              }
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Media */}
+      <div className="admin-form__section">
+        <div className="admin-form__field">
+          <label className="admin-form__label">IMAGE URL</label>
+          <input
+            className="admin-form__input"
+            value={form.image_url}
+            onChange={(e) => setForm((prev) => ({ ...prev, image_url: e.target.value }))}
+            required
+          />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="admin-form__section">
+        <div className="admin-form__field">
+          <label className="admin-form__label">DESCRIPTION</label>
+          <textarea
+            className="admin-form__textarea"
+            rows={8}
+            value={form.description}
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+          />
+        </div>
+        <div className="admin-form__field">
+          <label className="admin-form__label">DETAIL BULLETS</label>
+          <textarea
+            className="admin-form__textarea"
+            rows={5}
+            value={form.details}
+            onChange={(e) => setForm((prev) => ({ ...prev, details: e.target.value }))}
+            placeholder="One detail per line"
+          />
+        </div>
+        <div className="admin-form__field">
+          <label className="admin-form__label">BRAND LINE</label>
+          <input
+            className="admin-form__input"
+            value={form.brand_line}
+            onChange={(e) => setForm((prev) => ({ ...prev, brand_line: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      {/* Flags */}
+      <div className="admin-form__section">
+        <div className="admin-form__checks">
+          <label className="admin-form__check">
+            <input
+              type="checkbox"
+              checked={form.is_new}
+              onChange={(e) => setForm((prev) => ({ ...prev, is_new: e.target.checked }))}
+            />
+            MARK AS NEW
+          </label>
+          <label className="admin-form__check">
+            <input
+              type="checkbox"
+              checked={form.is_limited}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  is_limited: e.target.checked,
+                  status:
+                    prev.status === "ARCHIVED"
+                      ? "ARCHIVED"
+                      : e.target.checked
+                        ? "LIMITED"
+                        : "AVAILABLE",
+                }))
+              }
+            />
+            LIMITED PRODUCT
+          </label>
+          <div className="admin-form__field" style={{ marginBottom: 0 }}>
+            <label className="admin-form__label">STOCK QTY</label>
+            <input
+              className="admin-form__input"
+              type="number"
+              min="0"
+              value={form.stock_qty}
+              onChange={(e) => setForm((prev) => ({ ...prev, stock_qty: e.target.value }))}
+              disabled={!form.is_limited || form.status === "ARCHIVED"}
+              placeholder={form.is_limited ? "0" : "Not used"}
+              style={{ maxWidth: "160px" }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Result message */}
+      {result ? (
+        <p className={result.tone === "error" ? "admin-form__msg--error" : "admin-form__msg--ok"}>
+          {result.text}
+        </p>
+      ) : null}
+
+      {/* Actions */}
+      <div className="admin-form__actions">
+        <button className="btn btn--primary" type="submit" disabled={submitting}>
+          {submitting ? "SAVING..." : mode === "create" ? "CREATE PRODUCT" : "SAVE PRODUCT"}
+        </button>
+        <button
+          className="btn btn--ghost"
+          type="button"
+          onClick={() => router.push("/admin/products")}
+          disabled={submitting}
+        >
+          BACK TO PRODUCTS
+        </button>
+      </div>
+    </form>
   );
 }

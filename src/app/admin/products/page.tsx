@@ -30,15 +30,17 @@ export default async function AdminProductsPage() {
     .sort((left, right) => left.sort_order - right.sort_order || left.slug.localeCompare(right.slug));
 
   return (
-    <div className="page page--admin-wide">
-      <div className="page__head">
-        <h1 className="page__title">PRODUCTS</h1>
-        <p className="page__sub">
-          {products.length} product{products.length !== 1 ? "s" : ""} total.
-        </p>
+    <div className="admin-page">
+      <div className="admin-page__head">
+        <div>
+          <h1 className="admin-page__title">PRODUCTS</h1>
+          <p className="admin-page__sub">
+            {products.length} product{products.length !== 1 ? "s" : ""} total
+          </p>
+        </div>
       </div>
       {error ? (
-        <div className="checkout__error">Unable to load products: {error.message}</div>
+        <p className="admin-form__msg--error">Unable to load products: {error.message}</p>
       ) : (
         <ProductsTable products={products} />
       )}

@@ -35,32 +35,12 @@ function formatDate(iso: string) {
   }
 }
 
-function getStatusStyle(status: string): React.CSSProperties {
-  if (status === "confirmed") return { color: "#4caf50", fontWeight: 700 };
-  if (status === "cancelled") return { color: "var(--red)", fontWeight: 700 };
-  if (status === "completed") return { color: "#ffd700", fontWeight: 700 };
-  return { color: "var(--muted)" };
+function getStatusBadge(status: string): { cls: string } {
+  if (status === "confirmed") return { cls: "admin-badge--confirmed" };
+  if (status === "cancelled") return { cls: "admin-badge--cancelled" };
+  if (status === "completed") return { cls: "admin-badge--completed" };
+  return { cls: "admin-badge--pending" };
 }
-
-const cell: React.CSSProperties = {
-  padding: "10px 14px",
-  borderBottom: "1px solid var(--line)",
-  whiteSpace: "nowrap",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  fontFamily: "var(--mono)",
-};
-
-const head: React.CSSProperties = {
-  padding: "8px 14px",
-  borderBottom: "1px solid var(--line)",
-  color: "rgba(255,255,255,.4)",
-  fontWeight: 700,
-  letterSpacing: ".12em",
-  fontSize: "10px",
-  whiteSpace: "nowrap",
-  textAlign: "left",
-};
 
 export default function OrdersClient({
   orders,
@@ -87,57 +67,44 @@ export default function OrdersClient({
   return (
     <div>
       {stateMessage ? (
-        <div
-          className={stateMessage.tone === "error" ? "checkout__error" : "checkout__note"}
+        <p
+          className={stateMessage.tone === "error" ? "admin-form__msg--error" : "admin-form__msg--ok"}
           style={{ marginBottom: "16px" }}
         >
           {stateMessage.text}
-        </div>
+        </p>
       ) : null}
 
-      <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center" }}>
-        <input
-          type="search"
-          placeholder="Search by order ref, email, or name..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{
-            background: "transparent",
-            border: "1px solid var(--line)",
-            color: "var(--fg)",
-            padding: "8px 12px",
-            fontFamily: "var(--mono)",
-            fontSize: "12px",
-            width: "340px",
-            outline: "none",
-          }}
-        />
-        <span
-          style={{
-            fontSize: "11px",
-            color: "var(--muted)",
-            fontFamily: "var(--mono)",
-          }}
-        >
-          {filtered.length} / {orders.length}
-        </span>
+      <div className="admin-toolbar">
+        <div className="admin-toolbar__left">
+          <input
+            type="search"
+            className="admin-search"
+            placeholder="Search by order ref, email, or name..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <span className="admin-count">
+            {filtered.length} / {orders.length}
+          </span>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="checkout__note">No orders match.</div>
+        <p className="admin-count" style={{ padding: "20px 0" }}>No orders match.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
             <thead>
               <tr>
-                <th style={head}>ORDER REF</th>
-                <th style={head}>NAME</th>
-                <th style={head}>EMAIL</th>
-                <th style={head}>TOTAL</th>
-                <th style={head}>STATUS</th>
-                <th style={head}>EMAIL</th>
-                <th style={head}>DATE</th>
-                <th style={head}>ACTIONS</th>
+                <th>ORDER REF</th>
+                <th>NAME</th>
+                <th>EMAIL</th>
+                <th>TOTAL</th>
+                <th>STATUS</th>
+                <th>EMAIL</th>
+                <th>DATE</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -145,36 +112,31 @@ export default function OrdersClient({
                 const status = order.status.toLowerCase();
                 const canConfirm = status !== "confirmed" && status !== "completed";
                 const canCancel = status !== "cancelled" && status !== "completed";
+                const badge = getStatusBadge(status);
 
                 return (
                   <tr key={order.id}>
-                    <td style={{ ...cell, letterSpacing: ".06em", color: "var(--fg)" }}>
-                      {order.order_number || "—"}
-                    </td>
-                    <td style={{ ...cell, maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {order.customer_name || "—"}
-                    </td>
-                    <td style={{ ...cell, color: "var(--muted)", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <td className="admin-table__ref">{order.order_number || "—"}</td>
+                    <td className="admin-table__name">{order.customer_name || "—"}</td>
+                    <td className="admin-table__muted" style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {order.customer_email || "—"}
                     </td>
-                    <td style={{ ...cell, color: "var(--muted)" }}>
-                      {formatAmount(order.total_cents, order.currency)}
+                    <td className="admin-table__muted">{formatAmount(order.total_cents, order.currency)}</td>
+                    <td>
+                      <span className={`admin-badge ${badge.cls}`}>{status}</span>
                     </td>
-                    <td style={cell}>
-                      <span style={getStatusStyle(status)}>{status}</span>
-                    </td>
-                    <td style={{ ...cell, color: "var(--muted)", fontSize: "11px" }}>
+                    <td className="admin-table__muted" style={{ fontSize: "11px" }}>
                       {order.email_status || "—"}
                     </td>
-                    <td style={{ ...cell, color: "var(--muted)", fontSize: "11px" }}>
+                    <td className="admin-table__muted" style={{ fontSize: "11px" }}>
                       {formatDate(order.created_at)}
                     </td>
-                    <td style={{ ...cell, minWidth: "220px" }}>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                    <td className="admin-table__actions">
+                      <div className="admin-table__action-row">
                         <Link
                           className="btn btn--ghost"
                           href={`/success?order_id=${encodeURIComponent(order.id)}`}
-                          style={{ fontSize: "11px", padding: "4px 10px" }}
+                          style={{ fontSize: "11px", padding: "5px 12px" }}
                         >
                           VIEW
                         </Link>
@@ -189,7 +151,7 @@ export default function OrdersClient({
                             className="btn btn--primary"
                             type="submit"
                             disabled={!canConfirm}
-                            style={{ fontSize: "11px", padding: "4px 10px" }}
+                            style={{ fontSize: "11px", padding: "5px 12px" }}
                           >
                             CONFIRM
                           </button>
@@ -205,7 +167,7 @@ export default function OrdersClient({
                             className="btn btn--ghost"
                             type="submit"
                             disabled={!canCancel}
-                            style={{ fontSize: "11px", padding: "4px 10px" }}
+                            style={{ fontSize: "11px", padding: "5px 12px" }}
                           >
                             CANCEL
                           </button>
@@ -220,7 +182,7 @@ export default function OrdersClient({
                           <button
                             className="btn btn--ghost btn--danger"
                             type="submit"
-                            style={{ fontSize: "11px", padding: "4px 10px" }}
+                            style={{ fontSize: "11px", padding: "5px 12px" }}
                           >
                             DELETE
                           </button>

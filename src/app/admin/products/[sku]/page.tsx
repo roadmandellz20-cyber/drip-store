@@ -31,10 +31,12 @@ export default async function EditAdminProductPage({
 
   if (error || !data) {
     return (
-      <div className="page page--admin-wide">
-        <div className="page__head">
-          <h1 className="page__title">PRODUCT NOT FOUND</h1>
-          <p className="page__sub">That product could not be loaded.</p>
+      <div className="admin-page">
+        <div className="admin-page__head">
+          <div>
+            <h1 className="admin-page__title">PRODUCT NOT FOUND</h1>
+            <p className="admin-page__sub">That product could not be loaded.</p>
+          </div>
         </div>
       </div>
     );
@@ -43,10 +45,12 @@ export default async function EditAdminProductPage({
   const product = normalizeAdminProductRow(data as Record<string, unknown>);
 
   return (
-    <div className="page page--admin-wide">
-      <div className="page__head">
-        <h1 className="page__title">EDIT PRODUCT</h1>
-        <p className="page__sub">{product.slug}</p>
+    <div className="admin-page">
+      <div className="admin-page__head">
+        <div>
+          <h1 className="admin-page__title">EDIT PRODUCT</h1>
+          <p className="admin-page__sub">{product.slug}</p>
+        </div>
       </div>
 
       <ProductForm mode="edit" product={product} />

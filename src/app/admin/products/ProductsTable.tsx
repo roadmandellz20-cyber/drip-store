@@ -5,33 +5,19 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminProduct } from "@/lib/admin-products";
 
-const cell: React.CSSProperties = {
-  padding: "10px 14px",
-  borderBottom: "1px solid var(--line)",
-  whiteSpace: "nowrap",
-  verticalAlign: "middle",
-  fontSize: "13px",
-  fontFamily: "var(--mono)",
-};
-
-const head: React.CSSProperties = {
-  padding: "8px 14px",
-  borderBottom: "1px solid var(--line)",
-  color: "rgba(255,255,255,.4)",
-  fontWeight: 700,
-  letterSpacing: ".12em",
-  fontSize: "10px",
-  whiteSpace: "nowrap",
-  textAlign: "left",
-};
-
 function formatAmount(cents: number, currency: string) {
   return `${currency.toUpperCase()} ${Math.round(cents / 100).toLocaleString()}`;
 }
 
-function getVisibilityLabel(product: AdminProduct) {
-  if (!product.is_active || product.status === "ARCHIVED") return "ARCHIVED";
-  return "LIVE";
+function getStatusBadge(product: AdminProduct) {
+  if (!product.is_active || product.status === "ARCHIVED") return { label: "ARCHIVED", cls: "admin-badge--archived" };
+  if (product.is_limited) return { label: "LIMITED", cls: "admin-badge--limited" };
+  return { label: "AVAILABLE", cls: "admin-badge--available" };
+}
+
+function getVisibilityBadge(product: AdminProduct) {
+  if (!product.is_active || product.status === "ARCHIVED") return { label: "ARCHIVED", cls: "admin-badge--archived" };
+  return { label: "LIVE", cls: "admin-badge--live" };
 }
 
 export default function ProductsTable({ products }: { products: AdminProduct[] }) {
@@ -43,15 +29,8 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
-
     return products.filter((product) =>
-      [
-        product.slug,
-        product.title,
-        product.status,
-        product.is_new ? "new" : "",
-        product.is_limited ? "limited" : "",
-      ]
+      [product.slug, product.title, product.status, product.is_new ? "new" : "", product.is_limited ? "limited" : ""]
         .join(" ")
         .toLowerCase()
         .includes(q)
@@ -67,9 +46,7 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
     try {
       const response = await fetch(`/api/admin/products/${encodeURIComponent(product.slug)}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: product.title,
           description: product.description,
@@ -88,9 +65,7 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
       });
 
       const data = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || "Update failed.");
-      }
+      if (!response.ok) throw new Error(data.error || "Update failed.");
 
       startTransition(() => router.refresh());
     } catch (error) {
@@ -109,94 +84,82 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
 
   return (
     <div>
-      <div
-        style={{
-          marginBottom: "16px",
-          display: "flex",
-          gap: "12px",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+      <div className="admin-toolbar">
+        <div className="admin-toolbar__left">
           <input
             type="search"
+            className="admin-search"
             placeholder="Search by SKU, name, status..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{
-              background: "transparent",
-              border: "1px solid var(--line)",
-              color: "var(--fg)",
-              padding: "8px 12px",
-              fontFamily: "var(--mono)",
-              fontSize: "12px",
-              width: "320px",
-              outline: "none",
-            }}
           />
-          <span
-            style={{
-              fontSize: "11px",
-              color: "var(--muted)",
-              fontFamily: "var(--mono)",
-            }}
-          >
+          <span className="admin-count">
             {filtered.length} / {products.length}
           </span>
         </div>
-
         <Link className="btn btn--primary" href="/admin/products/new">
           NEW PRODUCT
         </Link>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="checkout__note">No products match.</div>
+        <p className="admin-count" style={{ padding: "20px 0" }}>No products match.</p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
             <thead>
               <tr>
-                <th style={head}>SKU</th>
-                <th style={head}>NAME</th>
-                <th style={head}>PRICE</th>
-                <th style={head}>STATUS</th>
-                <th style={head}>LIMITED</th>
-                <th style={head}>STOCK</th>
-                <th style={head}>SOLD</th>
-                <th style={head}>NEW</th>
-                <th style={head}>VISIBILITY</th>
-                <th style={head}>ACTIONS</th>
+                <th>SKU</th>
+                <th>NAME</th>
+                <th>PRICE</th>
+                <th>STATUS</th>
+                <th>VISIBILITY</th>
+                <th>LIMITED</th>
+                <th>STOCK</th>
+                <th>SOLD</th>
+                <th>NEW</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((product) => {
                 const row = rowState[product.slug];
                 const saving = Boolean(row?.saving) || isPending;
+                const statusBadge = getStatusBadge(product);
+                const visibilityBadge = getVisibilityBadge(product);
 
                 return (
-                  <tr key={product.slug} style={{ opacity: product.is_active ? 1 : 0.5 }}>
-                    <td style={{ ...cell, color: "var(--muted)" }}>{product.slug}</td>
-                    <td style={{ ...cell, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {product.title}
+                  <tr
+                    key={product.slug}
+                    className={!product.is_active ? "admin-table__row--faded" : ""}
+                  >
+                    <td className="admin-table__sku">{product.slug}</td>
+                    <td className="admin-table__name">{product.title}</td>
+                    <td className="admin-table__muted">{formatAmount(product.price_cents, product.currency)}</td>
+                    <td>
+                      <span className={`admin-badge ${statusBadge.cls}`}>{statusBadge.label}</span>
                     </td>
-                    <td style={{ ...cell, color: "var(--muted)" }}>
-                      {formatAmount(product.price_cents, product.currency)}
+                    <td>
+                      <span className={`admin-badge ${visibilityBadge.cls}`}>{visibilityBadge.label}</span>
                     </td>
-                    <td style={cell}>{product.status}</td>
-                    <td style={cell}>{product.is_limited ? "YES" : "NO"}</td>
-                    <td style={cell}>{product.stock_qty ?? "—"}</td>
-                    <td style={cell}>{product.sold_qty}</td>
-                    <td style={cell}>{product.is_new ? "YES" : "NO"}</td>
-                    <td style={cell}>{getVisibilityLabel(product)}</td>
-                    <td style={{ ...cell, minWidth: "220px" }}>
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <td>
+                      <span className={`admin-badge ${product.is_limited ? "admin-badge--yes" : "admin-badge--no"}`}>
+                        {product.is_limited ? "YES" : "NO"}
+                      </span>
+                    </td>
+                    <td className="admin-table__muted">{product.stock_qty ?? "—"}</td>
+                    <td className="admin-table__muted">{product.sold_qty}</td>
+                    <td>
+                      <span className={`admin-badge ${product.is_new ? "admin-badge--yes" : "admin-badge--no"}`}>
+                        {product.is_new ? "YES" : "NO"}
+                      </span>
+                    </td>
+                    <td className="admin-table__actions">
+                      <div className="admin-table__action-row">
                         <Link
                           className="btn btn--ghost"
                           href={`/admin/products/${encodeURIComponent(product.slug)}`}
-                          style={{ fontSize: "11px", padding: "4px 10px" }}
+                          style={{ fontSize: "11px", padding: "5px 12px" }}
                         >
                           EDIT
                         </Link>
@@ -204,13 +167,15 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
                           className={product.status === "ARCHIVED" ? "btn btn--primary" : "btn btn--ghost"}
                           type="button"
                           disabled={saving}
-                          style={{ fontSize: "11px", padding: "4px 10px" }}
+                          style={{ fontSize: "11px", padding: "5px 12px" }}
                           onClick={() => void toggleArchive(product)}
                         >
                           {saving ? "..." : product.status === "ARCHIVED" ? "UNARCHIVE" : "ARCHIVE"}
                         </button>
                         {row?.error ? (
-                          <span style={{ color: "var(--red)", fontSize: "11px" }}>{row.error}</span>
+                          <span style={{ color: "#c0392b", fontSize: "11px", fontFamily: "var(--mono)" }}>
+                            {row.error}
+                          </span>
                         ) : null}
                       </div>
                     </td>

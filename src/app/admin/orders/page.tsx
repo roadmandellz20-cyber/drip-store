@@ -70,13 +70,15 @@ export default async function AdminOrdersPage({
   );
 
   return (
-    <div className="page page--admin-wide">
-      <div className="page__head">
-        <h1 className="page__title">ORDERS</h1>
-        <p className="page__sub">
-          {error ? "Error loading orders." : `${orders.length} order${orders.length !== 1 ? "s" : ""} total.`}
-        </p>
-        <div className="page__actions">
+    <div className="admin-page">
+      <div className="admin-page__head">
+        <div>
+          <h1 className="admin-page__title">ORDERS</h1>
+          <p className="admin-page__sub">
+            {error ? "Error loading orders." : `${orders.length} order${orders.length !== 1 ? "s" : ""} total`}
+          </p>
+        </div>
+        <div className="admin-page__actions">
           <form action="/api/admin/logout" method="post">
             <input type="hidden" name={ADMIN_CSRF_FORM_FIELD} value={csrfToken} />
             <button className="btn btn--ghost" type="submit">
@@ -87,7 +89,7 @@ export default async function AdminOrdersPage({
       </div>
 
       {error ? (
-        <div className="checkout__error">Unable to load orders: {error.message}</div>
+        <p className="admin-form__msg--error">Unable to load orders: {error.message}</p>
       ) : (
         <OrdersClient orders={orders} csrfToken={csrfToken} stateMessage={stateMessage} />
       )}
