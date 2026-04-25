@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "llama-3.3-70b-versatile";
 const MAX_TOKENS = 500;
 
 const BASE_SYSTEM_PROMPT = `You are MUGEN OPS — the private store intelligence agent for Mugen District. You report directly to the store owner. No one else has access to you.
@@ -128,7 +128,7 @@ async function fetchStoreData(): Promise<string> {
 }
 
 export async function processAgentMessage(messageText: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return "API key not configured.";
   }
@@ -147,35 +147,36 @@ export async function processAgentMessage(messageText: string): Promise<string> 
   );
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${apiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages: [{ role: "user", content: messageText }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: messageText },
+        ],
       }),
     });
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => "(unreadable)");
       console.error(
-        `[mugenOps] Claude API error: status=${res.status} body=${errBody}`
+        `[mugenOps] Groq API error: status=${res.status} body=${errBody}`
       );
       return "MUGEN OPS offline. Check Vercel logs.";
     }
 
     const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
+      choices?: Array<{ message: { content: string } }>;
     };
 
     return (
-      data.content?.find((b) => b.type === "text")?.text?.trim() ??
+      data.choices?.[0]?.message?.content?.trim() ??
       "MUGEN OPS offline. Check Vercel logs."
     );
   } catch (err) {

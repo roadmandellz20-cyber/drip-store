@@ -5,7 +5,7 @@ import { isLaunchLive } from "@/lib/launch";
 export const runtime = "nodejs";
 
 const WHATSAPP_FALLBACK = "Hit us on WhatsApp for help: https://wa.me/2203340558";
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "llama-3.3-70b-versatile";
 const MAX_TOKENS = 300;
 const MAX_HISTORY_MESSAGES = 20;
 
@@ -114,9 +114,9 @@ function buildSystemPrompt(products: ProductRow[], launchLive: boolean): string 
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    console.error("[chat/route] ANTHROPIC_API_KEY is not set");
+    console.error("[chat/route] GROQ_API_KEY is not set");
     return NextResponse.json({ reply: "API key not configured" }, { status: 500 });
   }
 
@@ -141,35 +141,36 @@ export async function POST(req: NextRequest) {
     const launchLive = isLaunchLive(Date.now());
     const systemPrompt = buildSystemPrompt((products as ProductRow[] | null) ?? [], launchLive);
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${apiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt,
-        messages,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages,
+        ],
       }),
     });
 
-    if (!claudeRes.ok) {
-      const errBody = await claudeRes.text().catch(() => "(unreadable)");
+    if (!groqRes.ok) {
+      const errBody = await groqRes.text().catch(() => "(unreadable)");
       console.error(
-        `[chat/route] Claude API error: status=${claudeRes.status} body=${errBody}`
+        `[chat/route] Groq API error: status=${groqRes.status} body=${errBody}`
       );
       return NextResponse.json({ reply: WHATSAPP_FALLBACK });
     }
 
-    const claudeData = (await claudeRes.json()) as {
-      content?: Array<{ type: string; text: string }>;
+    const groqData = (await groqRes.json()) as {
+      choices?: Array<{ message: { content: string } }>;
     };
 
     const reply =
-      claudeData.content?.find((b) => b.type === "text")?.text?.trim() ?? WHATSAPP_FALLBACK;
+      groqData.choices?.[0]?.message?.content?.trim() ?? WHATSAPP_FALLBACK;
 
     return NextResponse.json({ reply });
   } catch (err) {
