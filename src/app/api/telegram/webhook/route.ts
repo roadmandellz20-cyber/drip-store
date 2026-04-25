@@ -30,11 +30,16 @@ async function sendTelegramMessage(chatId: number, text: string) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("[telegram/webhook] Received request:", request.method);
+
   // Verify webhook secret token
   const token = request.nextUrl.searchParams.get("token");
   const expectedToken = process.env.TELEGRAM_WEBHOOK_SECRET;
 
+  console.log("[telegram/webhook] Token present:", !!token, "| Secret configured:", !!expectedToken, "| Match:", token === expectedToken);
+
   if (!expectedToken || token !== expectedToken) {
+    console.log("[telegram/webhook] Token mismatch — returning 403");
     return NextResponse.json({ ok: false }, { status: 403 });
   }
 

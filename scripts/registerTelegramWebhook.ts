@@ -33,19 +33,25 @@ async function main() {
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: webhookUrl }),
+      body: JSON.stringify({ url: webhookUrl, drop_pending_updates: true }),
     }
   );
 
   const data = await res.json();
-  console.log("Response:", JSON.stringify(data, null, 2));
+  console.log("setWebhook response:", JSON.stringify(data, null, 2));
 
-  if (data.ok) {
-    console.log("Webhook registered successfully.");
-  } else {
+  if (!data.ok) {
     console.error("Failed to register webhook.");
     process.exit(1);
   }
+
+  console.log("Webhook registered. Verifying...");
+
+  const infoRes = await fetch(
+    `https://api.telegram.org/bot${botToken}/getWebhookInfo`
+  );
+  const info = await infoRes.json();
+  console.log("getWebhookInfo:", JSON.stringify(info, null, 2));
 }
 
 main();
