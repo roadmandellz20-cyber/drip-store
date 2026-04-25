@@ -54,15 +54,15 @@ export async function PATCH(
   }
 
   const payload = parsed.value;
-  // Write to all image column variants and both brand line columns so
-  // the save always works and keeps every alias in sync, regardless of
-  // which prior migrations were applied to this environment.
+  // Write to cover_image_url (the real primary column) plus all alias columns
+  // so every image field stays in sync regardless of migration history.
   const updates = {
     title: payload.title,
     description: payload.description,
     details: payload.details,
     brand_line: payload.brand_line,
     tagline: payload.brand_line,
+    cover_image_url: payload.image_url,
     image_url: payload.image_url,
     image_main: payload.image_url,
     image_alt: payload.image_url,

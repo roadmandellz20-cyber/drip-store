@@ -121,10 +121,10 @@ export function normalizeAdminProductRow(row: Record<string, unknown>): AdminPro
     description: asMultiline(row.description, 5000),
     details: normalizeProductDetails(row.details, []),
     brand_line: asString(row.brand_line || row.tagline, 120) || "ENTER THE MUGEN.",
-    image_url: sanitizeSingleLineInput(row.image_url || row.image_main || row.image_alt, {
-      collapseWhitespace: false,
-      maxLength: 2048,
-    }),
+    image_url: sanitizeSingleLineInput(
+      row.cover_image_url || row.image_url || row.image_main || row.image_alt,
+      { collapseWhitespace: false, maxLength: 2048 }
+    ),
     price_cents: normalizeInteger(row.price_cents, 0),
     currency: asString(row.currency, 8).toUpperCase() || "GMD",
     status,
