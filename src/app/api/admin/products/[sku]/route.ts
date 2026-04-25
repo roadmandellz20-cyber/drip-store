@@ -54,14 +54,18 @@ export async function PATCH(
   }
 
   const payload = parsed.value;
-  // Only update canonical columns — do not include legacy alias columns (tagline,
-  // image_main, image_alt) that may not exist in all environments.
+  // Write to all image column variants and both brand line columns so
+  // the save always works and keeps every alias in sync, regardless of
+  // which prior migrations were applied to this environment.
   const updates = {
     title: payload.title,
     description: payload.description,
     details: payload.details,
     brand_line: payload.brand_line,
+    tagline: payload.brand_line,
     image_url: payload.image_url,
+    image_main: payload.image_url,
+    image_alt: payload.image_url,
     price_cents: payload.price_cents,
     currency: payload.currency,
     status: payload.status,
