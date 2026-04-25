@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import FxLayer from "@/components/FxLayer";
 import TrustedNowProvider from "@/components/TrustedNowProvider";
 import BackHomeArrow from "@/components/BackHomeArrow";
+import ChatWidget from "@/components/ChatWidget";
 import { absoluteUrl, getSiteUrl, SITE_DESCRIPTION, SITE_NAME, SITE_OG_IMAGE } from "@/lib/site";
 import ToastClient from "./toast.client";
 
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Footer />
           <div id="toast" aria-live="polite" aria-atomic="true" />
           <ToastClient />
+          <ChatWidget />
           <SpeedInsights />
         </TrustedNowProvider>
       </body>
