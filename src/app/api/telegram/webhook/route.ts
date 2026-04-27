@@ -5,8 +5,6 @@ import { processAgentMessage } from "@/lib/mugenOpsAgent";
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID ?? "";
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
 async function sendMessage(chatId: number | string, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -16,26 +14,34 @@ async function sendMessage(chatId: number | string, text: string) {
   });
 }
 
-async function uploadPhotoToSupabase(fileBuffer: ArrayBuffer, filename: string): Promise<string | null> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+async function uploadPhotoToSupabase(imageBuffer: Buffer, filename: string): Promise<string | null> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/product-images/${filename}`;
-  const res = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "image/jpeg",
-      "x-upsert": "true",
-    },
-    body: fileBuffer,
-  });
-
-  if (!res.ok) {
-    console.error("[telegram/webhook] Supabase upload failed", res.status, await res.text().catch(() => ""));
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("[telegram/webhook] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     return null;
   }
 
-  return `${SUPABASE_URL}/storage/v1/object/public/product-images/${filename}`;
+  const { createClient } = await import("@supabase/supabase-js");
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  console.log("[telegram/webhook] Attempting upload to bucket: product-images, file:", filename);
+
+  const { error } = await supabase.storage
+    .from("product-images")
+    .upload(filename, imageBuffer, { contentType: "image/jpeg", upsert: true });
+
+  if (error) {
+    console.error("[telegram/webhook] Storage upload error:", JSON.stringify(error));
+    return null;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("product-images")
+    .getPublicUrl(filename);
+
+  return urlData.publicUrl;
 }
 
 async function handlePhoto(photo: Array<{ file_id: string; file_size?: number }>): Promise<string | null> {
@@ -52,9 +58,10 @@ async function handlePhoto(photo: Array<{ file_id: string; file_size?: number }>
     );
     if (!downloadRes.ok) return null;
 
-    const buffer = await downloadRes.arrayBuffer();
+    const arrayBuffer = await downloadRes.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
     const filename = `product-${Date.now()}.jpg`;
-    return await uploadPhotoToSupabase(buffer, filename);
+    return await uploadPhotoToSupabase(imageBuffer, filename);
   } catch (err) {
     console.error("[telegram/webhook] Photo handling error:", err);
     return null;
