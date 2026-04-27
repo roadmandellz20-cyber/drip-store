@@ -5,7 +5,7 @@ const MAX_TOKENS = 800;
 
 const ALLOWED_PRODUCT_FIELDS = ["status", "is_new", "is_limited", "stock_qty", "brand_line"] as const;
 
-// ─── Pending confirmation state (module-level, survives within a warm serverless instance) ──
+// ─── Session state (module-level, survives within a warm serverless instance) ──
 
 type PendingProductCreate = {
   actionStr: string;
@@ -13,7 +13,34 @@ type PendingProductCreate = {
   summary: string;
 };
 
-const pendingProducts = new Map<string, PendingProductCreate>();
+type ProductFlow =
+  | { step: "waiting_for_design_name"; imageUrl: string }
+  | { step: "waiting_for_limited_or_standard"; imageUrl: string; designName: string }
+  | { step: "waiting_for_confirmation"; pending: PendingProductCreate };
+
+type Session = {
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  productFlow: ProductFlow | null;
+};
+
+const sessions = new Map<string, Session>();
+
+function getSession(id: string): Session {
+  let session = sessions.get(id);
+  if (!session) {
+    session = { conversationHistory: [], productFlow: null };
+    sessions.set(id, session);
+  }
+  return session;
+}
+
+function addToHistory(session: Session, role: "user" | "assistant", content: string) {
+  session.conversationHistory.push({ role, content });
+  if (session.conversationHistory.length > 10) {
+    session.conversationHistory = session.conversationHistory.slice(-10);
+  }
+}
+
 type AllowedField = (typeof ALLOWED_PRODUCT_FIELDS)[number];
 
 const VALID_STATUSES = ["AVAILABLE", "LIMITED", "ARCHIVED", "COMING_SOON"] as const;
@@ -762,27 +789,110 @@ const ACTION_RE = /\[ACTION:([^\]]+)\]/;
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export async function processAgentMessage(messageText: string, chatId: string | number, imageUrl?: string): Promise<string> {
+export async function processAgentMessage(
+  messageText: string,
+  chatId: string | number,
+  imageUrl?: string
+): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return "API key not configured.";
 
-  const pendingKey = String(chatId);
+  const sessionKey = String(chatId);
+  const session = getSession(sessionKey);
 
-  // Check for pending product confirmation first
-  const pending = pendingProducts.get(pendingKey);
-  if (pending) {
-    const normalized = messageText.toLowerCase().trim();
-    if (normalized === "yes" || normalized === "y" || normalized === "confirm") {
-      pendingProducts.delete(pendingKey);
-      const result = await executePendingCreate(pending);
-      return result;
-    } else if (normalized === "no" || normalized === "n" || normalized === "cancel") {
-      pendingProducts.delete(pendingKey);
-      return "Cancelled. No product was created.";
-    } else {
-      return `Pending confirmation:\n\n${pending.summary}`;
+  // ── Active product creation flow — handled entirely in code ──────────────
+
+  if (session.productFlow) {
+    const flow = session.productFlow;
+
+    if (flow.step === "waiting_for_design_name") {
+      const designName = messageText.trim();
+      if (!designName) return "I need the design name. What do you want to call this product?";
+      addToHistory(session, "user", messageText);
+      session.productFlow = { step: "waiting_for_limited_or_standard", imageUrl: flow.imageUrl, designName };
+      const reply = `Got it — ${designName}.\n\nIs this LIMITED (10 stock, GMD 2,000) or STANDARD (no stock limit, GMD 1,500)?`;
+      addToHistory(session, "assistant", reply);
+      return reply;
+    }
+
+    if (flow.step === "waiting_for_limited_or_standard") {
+      const norm = messageText.toLowerCase();
+      const isLimited = norm.includes("limit") || norm === "l";
+      const isStandard = norm.includes("standard") || norm.includes("std") || norm === "s";
+      if (!isLimited && !isStandard) return "Reply LIMITED or STANDARD.";
+
+      addToHistory(session, "user", messageText);
+      const { designName, imageUrl: flowImageUrl } = flow;
+
+      // Call model once to generate all product fields
+      const storeData = await fetchStoreData().catch(() => "unavailable");
+      const systemPrompt = BASE_SYSTEM_PROMPT
+        .replace("[IMAGE CONTEXT INJECTED HERE]", flowImageUrl ? `Image URL: ${flowImageUrl}` : "")
+        .replace("[STORE DATA INJECTED HERE]", storeData);
+
+      const genPrompt = `Generate a Mugen District product for this design:
+Design name: ${designName}
+Image URL: ${flowImageUrl || "none"}
+Type: ${isLimited ? "LIMITED" : "STANDARD"}
+
+Respond with ONLY one [ACTION:tool_create_product|...] tag, nothing else.
+Format: [ACTION:tool_create_product|sku|title|price_gmd|status|is_limited|stock_qty|is_new|brand_line|description]
+Values: price_gmd=${isLimited ? "2000" : "1500"}, status=${isLimited ? "LIMITED" : "AVAILABLE"}, is_limited=${isLimited}, stock_qty=${isLimited ? "10" : "null"}, is_new=true, brand_line=ENTER THE MUGEN.`;
+
+      const genMessages: GroqMessage[] = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: genPrompt },
+      ];
+
+      const generated = await callGroq(apiKey, genMessages);
+      const actionMatch = ACTION_RE.exec(generated);
+
+      if (!actionMatch || !actionMatch[1].startsWith("tool_create_product")) {
+        session.productFlow = null;
+        return "Failed to generate product. Try again — send the image and say 'new product'.";
+      }
+
+      const parts = actionMatch[1].split("|");
+      const summary = buildCreateSummary(parts, flowImageUrl);
+      const pending: PendingProductCreate = { actionStr: actionMatch[1], imageUrl: flowImageUrl, summary };
+      session.productFlow = { step: "waiting_for_confirmation", pending };
+      addToHistory(session, "assistant", summary);
+      return summary;
+    }
+
+    if (flow.step === "waiting_for_confirmation") {
+      const norm = messageText.toLowerCase().trim();
+      addToHistory(session, "user", messageText);
+
+      if (norm === "yes" || norm === "y" || norm === "confirm") {
+        session.productFlow = null;
+        const result = await executePendingCreate(flow.pending);
+        addToHistory(session, "assistant", result);
+        return result;
+      }
+      if (norm === "no" || norm === "n" || norm === "cancel") {
+        session.productFlow = null;
+        const reply = "Cancelled. No product was created.";
+        addToHistory(session, "assistant", reply);
+        return reply;
+      }
+      return `Pending confirmation:\n\n${flow.pending.summary}`;
     }
   }
+
+  // ── Photo received with no active flow → start product creation ───────────
+
+  if (imageUrl) {
+    session.productFlow = { step: "waiting_for_design_name", imageUrl };
+    addToHistory(session, "user", messageText || "[image]");
+    const reply = "Image uploaded ✓\n\nWhat is the design name?";
+    addToHistory(session, "assistant", reply);
+    return reply;
+  }
+
+  // ── General conversation with history ─────────────────────────────────────
+
+  addToHistory(session, "user", messageText);
 
   let storeData: string;
   try {
@@ -792,17 +902,13 @@ export async function processAgentMessage(messageText: string, chatId: string | 
     storeData = "STORE DATA: unavailable — Supabase fetch failed.";
   }
 
-  const imageContext = imageUrl
-    ? `An image has been uploaded. Public URL: ${imageUrl}\nAnalyze this image to identify the anime character and universe it belongs to based on your knowledge. Use this to inform any product creation.`
-    : "";
-
   const systemPrompt = BASE_SYSTEM_PROMPT
-    .replace("[IMAGE CONTEXT INJECTED HERE]", imageContext)
+    .replace("[IMAGE CONTEXT INJECTED HERE]", "")
     .replace("[STORE DATA INJECTED HERE]", storeData);
 
   const messages: GroqMessage[] = [
     { role: "system", content: systemPrompt },
-    { role: "user", content: messageText },
+    ...session.conversationHistory.map((m) => ({ role: m.role as GroqMessage["role"], content: m.content })),
   ];
 
   try {
@@ -810,17 +916,21 @@ export async function processAgentMessage(messageText: string, chatId: string | 
     const actionMatch = ACTION_RE.exec(firstResponse);
 
     if (!actionMatch) {
+      addToHistory(session, "assistant", firstResponse);
       return firstResponse;
     }
 
     const parts = actionMatch[1].split("|");
     const visibleText = firstResponse.replace(ACTION_RE, "").trim();
 
-    // Intercept product creation — require explicit confirmation before inserting
+    // Intercept text-only product creation (no image) — go straight to confirmation
     if (parts[0] === "tool_create_product") {
-      const summary = buildCreateSummary(parts, imageUrl ?? "");
-      pendingProducts.set(pendingKey, { actionStr: actionMatch[1], imageUrl: imageUrl ?? "", summary });
-      return visibleText ? `${visibleText}\n\n${summary}` : summary;
+      const summary = buildCreateSummary(parts, "");
+      const pending: PendingProductCreate = { actionStr: actionMatch[1], imageUrl: "", summary };
+      session.productFlow = { step: "waiting_for_confirmation", pending };
+      const response = visibleText ? `${visibleText}\n\n${summary}` : summary;
+      addToHistory(session, "assistant", response);
+      return response;
     }
 
     // All other actions execute immediately
@@ -834,7 +944,9 @@ export async function processAgentMessage(messageText: string, chatId: string | 
     });
 
     const finalResponse = await callGroq(apiKey, messages);
-    return visibleText ? `${visibleText}\n\n${finalResponse}` : finalResponse;
+    const fullResponse = visibleText ? `${visibleText}\n\n${finalResponse}` : finalResponse;
+    addToHistory(session, "assistant", fullResponse);
+    return fullResponse;
   } catch (err) {
     console.error("[mugenOps] Unexpected error:", err);
     return "MUGEN OPS offline. Check Vercel logs.";
