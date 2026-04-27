@@ -25,17 +25,18 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
   const [query, setQuery] = useState("");
   const [rowState, setRowState] = useState<Record<string, { saving?: boolean; error?: string }>>({});
   const [isPending, startTransition] = useTransition();
+  const [localProducts, setLocalProducts] = useState(products);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((product) =>
+    if (!q) return localProducts;
+    return localProducts.filter((product) =>
       [product.slug, product.title, product.status, product.is_new ? "new" : "", product.is_limited ? "limited" : ""]
         .join(" ")
         .toLowerCase()
         .includes(q)
     );
-  }, [products, query]);
+  }, [localProducts, query]);
 
   async function toggleArchive(product: AdminProduct) {
     setRowState((prev) => ({ ...prev, [product.slug]: { saving: true } }));
@@ -80,6 +81,39 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
     }
 
     setRowState((prev) => ({ ...prev, [product.slug]: { saving: false } }));
+  }
+
+  async function deleteProduct(product: AdminProduct) {
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${product.title}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setRowState((prev) => ({ ...prev, [product.slug]: { saving: true } }));
+
+    try {
+      const response = await fetch(`/api/admin/products/${encodeURIComponent(product.slug)}`, {
+        method: "DELETE",
+      });
+
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Delete failed.");
+
+      setLocalProducts((prev) => prev.filter((p) => p.slug !== product.slug));
+      setRowState((prev) => {
+        const next = { ...prev };
+        delete next[product.slug];
+        return next;
+      });
+    } catch (error) {
+      setRowState((prev) => ({
+        ...prev,
+        [product.slug]: {
+          saving: false,
+          error: error instanceof Error ? error.message : "Delete failed.",
+        },
+      }));
+    }
   }
 
   return (
@@ -174,6 +208,20 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
                           >
                             {saving ? "..." : product.status === "ARCHIVED" ? "UNARCHIVE" : "ARCHIVE"}
                           </button>
+                          <button
+                            className="btn btn--ghost"
+                            type="button"
+                            disabled={saving}
+                            style={{
+                              fontSize: "11px",
+                              padding: "5px 12px",
+                              borderColor: "#c0392b",
+                              color: "#fff",
+                            }}
+                            onClick={() => void deleteProduct(product)}
+                          >
+                            DELETE
+                          </button>
                           {row?.error ? (
                             <span style={{ color: "#c0392b", fontSize: "11px", fontFamily: "var(--mono)" }}>
                               {row.error}
@@ -234,6 +282,20 @@ export default function ProductsTable({ products }: { products: AdminProduct[] }
                       onClick={() => void toggleArchive(product)}
                     >
                       {saving ? "..." : product.status === "ARCHIVED" ? "UNARCHIVE" : "ARCHIVE"}
+                    </button>
+                    <button
+                      className="btn btn--ghost"
+                      type="button"
+                      disabled={saving}
+                      style={{
+                        fontSize: "11px",
+                        padding: "6px 16px",
+                        borderColor: "#c0392b",
+                        color: "#fff",
+                      }}
+                      onClick={() => void deleteProduct(product)}
+                    >
+                      DELETE
                     </button>
                   </div>
                   {row?.error ? (

@@ -101,3 +101,48 @@ export async function PATCH(
     product: normalizeAdminProductRow(result.data as Record<string, unknown>),
   });
 }
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ sku: string }> }
+) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
+  }
+
+  const sessionCookie = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
+  if (!(await verifyAdminSession(sessionCookie))) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { sku } = await context.params;
+  const slug = sanitizeSlugInput(sku, 64);
+  if (!slug) {
+    return NextResponse.json({ error: "Invalid SKU." }, { status: 400 });
+  }
+
+  // Check for existing orders referencing this product — warn but still allow delete
+  const orderCheck = await supabaseAdmin
+    .from("order_items")
+    .select("id")
+    .eq("product_sku", slug)
+    .limit(1);
+
+  if (orderCheck.error) {
+    console.warn("[admin/products] Could not check order references for slug:", slug, orderCheck.error);
+  } else if (orderCheck.data && orderCheck.data.length > 0) {
+    console.warn("[admin/products] Deleting product with existing order references:", slug);
+  }
+
+  const result = await supabaseAdmin.from("products").delete().eq("slug", slug);
+
+  if (result.error) {
+    console.error("[admin/products] Supabase delete error:", result.error);
+    return NextResponse.json(
+      { error: result.error.message || "Database delete failed." },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
+}
