@@ -1,10 +1,7 @@
 export const runtime = "nodejs";
 
-import { processAgentMessage } from "@/lib/mugenOpsAgent";
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID ?? "";
 
 async function sendMessage(chatId: number | string, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -47,16 +44,8 @@ export async function POST(request: Request) {
 
   const chatId = message.chat.id;
 
-  if (ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
-    await sendMessage(chatId, "Access denied.");
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  const reply = await processAgentMessage(message.text);
-  await sendMessage(chatId, reply);
+  // TEMP: echo chat ID so we can verify/fix TELEGRAM_ADMIN_CHAT_ID env var
+  await sendMessage(chatId, `Your chat ID is: ${chatId}`);
 
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
