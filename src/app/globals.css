@@ -2621,7 +2621,7 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   transition:color .15s;
 }
 .admin-sidebar__back:hover{color:rgba(255,255,255,.6)}
-.admin-content{flex:1; margin-left:200px; min-height:100vh}
+.admin-content{flex:1; margin-left:200px; min-height:100vh; min-width:0; overflow:hidden}
 
 /* Hamburger */
 .admin-hamburger{
@@ -2815,17 +2815,55 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
   letter-spacing:.08em; padding:10px 0;
 }
 
+/* Admin product card list (mobile) */
+.admin-card-list{display:none; flex-direction:column; gap:1px}
+.admin-card{
+  background:#0a0a0a;
+  border:1px solid rgba(255,255,255,.07);
+  padding:14px 14px 12px;
+}
+.admin-card__top{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:6px;
+}
+.admin-card__sku{
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em;
+  color:rgba(255,255,255,.35); text-transform:uppercase;
+}
+.admin-card__badges{display:flex; gap:5px; flex-wrap:wrap; align-items:center}
+.admin-card__name{
+  font-family:var(--mono); font-size:13px; font-weight:700;
+  color:#fff; margin-bottom:8px; letter-spacing:.04em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.admin-card__meta{
+  display:flex; gap:12px; align-items:center;
+  font-family:var(--mono); font-size:11px;
+  color:rgba(255,255,255,.35); margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.admin-card__meta span{display:flex; gap:4px; align-items:center}
+.admin-card__meta strong{color:rgba(255,255,255,.65)}
+.admin-card__actions{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+.admin-card__error{
+  font-family:var(--mono); font-size:11px; color:#c0392b;
+  letter-spacing:.06em; margin-top:6px;
+}
+.admin-card--faded{opacity:.45}
+
 /* Mobile admin */
 @media(max-width:768px){
   .admin-sidebar{transform:translateX(-100%)}
   .admin-sidebar--open{transform:translateX(0)}
-  .admin-content{margin-left:0}
+  .admin-content{margin-left:0; overflow:visible}
   .admin-hamburger{display:flex}
   .admin-overlay{display:block}
-  .admin-page{padding:16px 16px 60px; padding-top:60px}
+  .admin-page{padding:12px 12px 60px; padding-top:56px}
   .admin-form__row2{grid-template-columns:1fr}
   .admin-search{width:100%}
   .admin-page__head{flex-direction:column; align-items:flex-start}
   .admin-toolbar{flex-direction:column; align-items:stretch}
   .admin-toolbar__left{flex-direction:column; align-items:stretch}
+  .admin-table-wrap{display:none}
+  .admin-card-list{display:flex}
 }
