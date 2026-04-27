@@ -1,24 +1,56 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const MODEL = "llama-3.3-70b-versatile";
-const MAX_TOKENS = 700;
+const MAX_TOKENS = 800;
 
 const ALLOWED_PRODUCT_FIELDS = ["status", "is_new", "is_limited", "stock_qty", "brand_line"] as const;
 type AllowedField = (typeof ALLOWED_PRODUCT_FIELDS)[number];
 
-const VALID_STATUSES = ["AVAILABLE", "LIMITED", "ARCHIVED"] as const;
+const VALID_STATUSES = ["AVAILABLE", "LIMITED", "ARCHIVED", "COMING_SOON"] as const;
 type ValidStatus = (typeof VALID_STATUSES)[number];
+
+// ─── Audit log ────────────────────────────────────────────────────────────────
+
+async function logAction(
+  actionType: string,
+  targetSku: string | null,
+  fieldChanged: string | null,
+  valueBefore: unknown,
+  valueAfter: unknown,
+  notes?: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin.from("mugen_ops_log").insert({
+      action_type: actionType,
+      target_sku: targetSku,
+      field_changed: fieldChanged,
+      value_before: valueBefore ?? null,
+      value_after: valueAfter ?? null,
+      notes: notes ?? null,
+    }).select("id").single();
+
+    if (error) {
+      console.error("[mugenOps] logAction failed:", error.message);
+      return null;
+    }
+
+    return (data as { id: string } | null)?.id ?? null;
+  } catch (err) {
+    console.error("[mugenOps] logAction threw:", err);
+    return null;
+  }
+}
 
 // ─── Tools ────────────────────────────────────────────────────────────────────
 
 async function tool_set_product_field(sku: string, field: string, value: string): Promise<string> {
   if (!ALLOWED_PRODUCT_FIELDS.includes(field as AllowedField)) {
-    return `Error: '${field}' is not updatable. Allowed fields: ${ALLOWED_PRODUCT_FIELDS.join(", ")}.`;
+    return `Error: '${field}' is not updatable. Allowed: ${ALLOWED_PRODUCT_FIELDS.join(", ")}.`;
   }
 
   const { data: existing, error: fetchErr } = await supabaseAdmin
     .from("products")
-    .select("slug")
+    .select("slug, status, is_new, is_limited, stock_qty, brand_line, is_active")
     .eq("slug", sku)
     .single();
 
@@ -26,7 +58,12 @@ async function tool_set_product_field(sku: string, field: string, value: string)
     return `Error: SKU '${sku}' not found in Supabase.`;
   }
 
+  const row = existing as Record<string, unknown>;
+  const valueBefore = { [field]: row[field] };
+
   let coerced: unknown = value;
+  let extraUpdates: Record<string, unknown> = {};
+
   if (field === "is_new" || field === "is_limited") {
     coerced = value === "true" || value === "1";
   } else if (field === "stock_qty") {
@@ -39,14 +76,18 @@ async function tool_set_product_field(sku: string, field: string, value: string)
       return `Error: status must be one of ${VALID_STATUSES.join(", ")}.`;
     }
     coerced = upper;
+    // Sync is_active with status
+    extraUpdates.is_active = upper !== "ARCHIVED";
   }
 
   const { error: updateErr } = await supabaseAdmin
     .from("products")
-    .update({ [field]: coerced })
+    .update({ [field]: coerced, ...extraUpdates })
     .eq("slug", sku);
 
   if (updateErr) return `Error updating ${field}: ${updateErr.message}`;
+
+  await logAction("set_field", sku, field, valueBefore, { [field]: coerced, ...extraUpdates });
 
   const { data: updated } = await supabaseAdmin
     .from("products")
@@ -81,7 +122,6 @@ async function tool_create_product(
 
   const priceGmd = parseInt(price_gmd, 10);
   if (isNaN(priceGmd) || priceGmd <= 0) return `Error: price must be a positive integer in GMD.`;
-  const priceCents = priceGmd * 100;
 
   const statusUpper = status.toUpperCase();
   if (!VALID_STATUSES.includes(statusUpper as ValidStatus)) {
@@ -97,13 +137,13 @@ async function tool_create_product(
     return `Error: limited products require a valid stock_qty >= 0.`;
   }
 
-  const { error } = await supabaseAdmin.from("products").insert({
+  const payload = {
     slug: sku,
     title: name,
     description: description || "",
     brand_line: brand_line || "ENTER THE MUGEN.",
     image_url: "",
-    price_cents: priceCents,
+    price_cents: priceGmd * 100,
     currency: "GMD",
     status: statusUpper,
     is_active: statusUpper !== "ARCHIVED",
@@ -113,20 +153,27 @@ async function tool_create_product(
     is_new: isNewBool,
     sort_order: 0,
     details: [],
-  });
+  };
 
+  const { error } = await supabaseAdmin.from("products").insert(payload);
   if (error) return `Error creating product: ${error.message}`;
+
+  await logAction("create", sku, null, null, payload);
+
   return `Done. '${name}' (${sku}) created. GMD ${priceGmd} | ${statusUpper} | limited=${isLimitedBool} | stock=${stockQtyInt ?? "unlimited"} | new=${isNewBool}`;
 }
 
 async function tool_archive_product(sku: string): Promise<string> {
   const { data: existing, error: fetchErr } = await supabaseAdmin
     .from("products")
-    .select("slug, title")
+    .select("slug, title, status, is_active")
     .eq("slug", sku)
     .single();
 
   if (fetchErr || !existing) return `Error: SKU '${sku}' not found.`;
+
+  const p = existing as { slug: string; title: string; status: string; is_active: boolean };
+  const valueBefore = { status: p.status, is_active: p.is_active };
 
   const { error } = await supabaseAdmin
     .from("products")
@@ -135,12 +182,241 @@ async function tool_archive_product(sku: string): Promise<string> {
 
   if (error) return `Error archiving: ${error.message}`;
 
-  const p = existing as { slug: string; title: string };
+  await logAction("archive", sku, "status", valueBefore, { status: "ARCHIVED", is_active: false });
+
   return `Done. '${p.title}' (${sku}) archived. status → ARCHIVED, is_active → false.`;
 }
 
 async function tool_set_launch_date(_isoDate: string): Promise<string> {
   return `No app_config table in Supabase. Launch date is controlled via NEXT_PUBLIC_LAUNCH_AT env var on Vercel. Update it there to change the drop date.`;
+}
+
+async function tool_bulk_set_field(target: string, field: string, value: string): Promise<string> {
+  if (!ALLOWED_PRODUCT_FIELDS.includes(field as AllowedField)) {
+    return `Error: '${field}' is not updatable. Allowed: ${ALLOWED_PRODUCT_FIELDS.join(", ")}.`;
+  }
+
+  const { data: products, error: fetchErr } = await supabaseAdmin
+    .from("products")
+    .select("slug, " + field);
+
+  if (fetchErr || !products) return `Error fetching products: ${fetchErr?.message ?? "unknown"}`;
+
+  const rows = (products as unknown) as Array<Record<string, unknown>>;
+  const targetRows = target === "all" ? rows : rows.filter((r) => r.slug === target);
+
+  if (targetRows.length === 0) return `No products found for target '${target}'.`;
+
+  let coerced: unknown = value;
+  if (field === "is_new" || field === "is_limited") {
+    coerced = value === "true" || value === "1";
+  } else if (field === "stock_qty") {
+    const n = parseInt(value, 10);
+    if (isNaN(n) || n < 0) return `Error: stock_qty must be a non-negative integer.`;
+    coerced = n;
+  } else if (field === "status") {
+    const upper = value.toUpperCase();
+    if (!VALID_STATUSES.includes(upper as ValidStatus)) {
+      return `Error: status must be one of ${VALID_STATUSES.join(", ")}.`;
+    }
+    coerced = upper;
+  }
+
+  const updatedSkus: string[] = [];
+  const errors: string[] = [];
+
+  for (const row of targetRows) {
+    const sku = String(row.slug);
+    const { error: updateErr } = await supabaseAdmin
+      .from("products")
+      .update({ [field]: coerced })
+      .eq("slug", sku);
+
+    if (updateErr) {
+      errors.push(`${sku}: ${updateErr.message}`);
+      continue;
+    }
+
+    await logAction("bulk_set_field", sku, field, { [field]: row[field] }, { [field]: coerced });
+    updatedSkus.push(sku);
+  }
+
+  const summary = `Updated ${updatedSkus.length} products. ${field} → ${coerced} for: ${updatedSkus.join(", ")}`;
+  return errors.length > 0 ? `${summary}\nErrors: ${errors.join("; ")}` : summary;
+}
+
+async function tool_revert(logId?: string): Promise<string> {
+  let query = supabaseAdmin
+    .from("mugen_ops_log")
+    .select("*")
+    .eq("reverted", false);
+
+  if (logId) {
+    query = query.eq("id", logId);
+  } else {
+    query = query.order("executed_at", { ascending: false }).limit(1);
+  }
+
+  const { data, error } = await query;
+  if (error) return `Error reading log: ${error.message}`;
+
+  const rows = data as Array<Record<string, unknown>> | null;
+  if (!rows || rows.length === 0) {
+    return logId ? `Log entry '${logId}' not found or already reverted.` : "No revertible actions found.";
+  }
+
+  const entry = rows[0];
+  const actionType = String(entry.action_type);
+  const targetSku = entry.target_sku ? String(entry.target_sku) : null;
+  const fieldChanged = entry.field_changed ? String(entry.field_changed) : null;
+  const valueBefore = entry.value_before as Record<string, unknown> | null;
+
+  if (!targetSku) {
+    return `Cannot revert log entry — no target SKU recorded.`;
+  }
+
+  // Perform the revert
+  let revertErr: string | null = null;
+
+  if (actionType === "create") {
+    // Revert a create = archive it
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ status: "ARCHIVED", is_active: false })
+      .eq("slug", targetSku);
+    if (error) revertErr = error.message;
+  } else if (valueBefore && fieldChanged) {
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ [fieldChanged]: valueBefore[fieldChanged] })
+      .eq("slug", targetSku);
+    if (error) revertErr = error.message;
+  } else if (valueBefore && Object.keys(valueBefore).length > 0) {
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update(valueBefore)
+      .eq("slug", targetSku);
+    if (error) revertErr = error.message;
+  } else {
+    return `Cannot revert — no value_before stored for this log entry.`;
+  }
+
+  if (revertErr) return `Error reverting: ${revertErr}`;
+
+  // Mark as reverted
+  await supabaseAdmin
+    .from("mugen_ops_log")
+    .update({ reverted: true, reverted_at: new Date().toISOString() })
+    .eq("id", String(entry.id));
+
+  return `Reverted. ${targetSku} ${fieldChanged ?? "status"} restored to previous value.`;
+}
+
+async function tool_get_history(limitStr: string): Promise<string> {
+  const limit = Math.min(Math.max(parseInt(limitStr, 10) || 10, 1), 50);
+
+  const { data, error } = await supabaseAdmin
+    .from("mugen_ops_log")
+    .select("id, action_type, target_sku, field_changed, value_before, value_after, executed_at, reverted")
+    .order("executed_at", { ascending: false })
+    .limit(limit);
+
+  if (error) return `Error reading history: ${error.message}`;
+
+  const rows = data as Array<Record<string, unknown>> | null;
+  if (!rows || rows.length === 0) return "No actions logged yet.";
+
+  const lines = rows.map((r) => {
+    const date = String(r.executed_at).slice(0, 16).replace("T", " ");
+    const reverted = r.reverted ? " [REVERTED]" : "";
+    const after = r.value_after
+      ? ` → ${JSON.stringify(r.value_after).slice(0, 60)}`
+      : "";
+    return `${date} | ${r.action_type} | ${r.target_sku ?? "—"} | ${r.field_changed ?? "—"}${after}${reverted}\nID: ${r.id}`;
+  });
+
+  return `Last ${rows.length} actions:\n\n${lines.join("\n\n")}`;
+}
+
+async function tool_push_coming_soon_page(): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+
+  if (!token || !owner || !repo) {
+    return `GitHub env vars not set. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel environment variables.`;
+  }
+
+  const path = "src/app/coming-soon/page.tsx";
+  const content = `import type { Metadata } from "next";
+import ProductGrid from "@/components/ProductGrid";
+import { fetchComingSoonProducts } from "@/lib/products-server";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Coming Soon — Next Archive",
+  description: "The next drop is loading. Mugen District.",
+  alternates: { canonical: "/coming-soon" },
+};
+
+export default async function ComingSoonPage() {
+  const products = await fetchComingSoonProducts();
+
+  return (
+    <div className="page">
+      <div className="page__head">
+        <h1 className="page__title">COMING SOON</h1>
+        <p className="page__sub">Next archive. Incoming.</p>
+      </div>
+      {products.length === 0 ? (
+        <p className="page__empty">Nothing confirmed yet. Stay locked.</p>
+      ) : (
+        <ProductGrid products={products} priorityCount={0} />
+      )}
+    </div>
+  );
+}
+`;
+
+  const encoded = Buffer.from(content).toString("base64");
+  const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+  };
+
+  // Check if file already exists (need SHA for update)
+  let sha: string | undefined;
+  try {
+    const existsRes = await fetch(apiBase, { headers });
+    if (existsRes.ok) {
+      const existsData = (await existsRes.json()) as { sha?: string };
+      sha = existsData.sha;
+    }
+  } catch {
+    // File doesn't exist — create it
+  }
+
+  const body: Record<string, unknown> = {
+    message: "feat: update coming-soon page via MUGEN OPS",
+    content: encoded,
+    branch: "main",
+  };
+  if (sha) body.sha = sha;
+
+  const pushRes = await fetch(apiBase, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!pushRes.ok) {
+    const errText = await pushRes.text().catch(() => "");
+    return `GitHub push failed (${pushRes.status}): ${errText.slice(0, 200)}`;
+  }
+
+  return `Coming soon page pushed to GitHub. Vercel deploying now — live in ~2 minutes at mugendistrict.com/coming-soon`;
 }
 
 // ─── ACTION executor ──────────────────────────────────────────────────────────
@@ -169,6 +445,14 @@ async function executeAction(actionStr: string): Promise<string> {
         return await tool_archive_product(parts[1] ?? "");
       case "tool_set_launch_date":
         return await tool_set_launch_date(parts[1] ?? "");
+      case "tool_bulk_set_field":
+        return await tool_bulk_set_field(parts[1] ?? "all", parts[2] ?? "", parts[3] ?? "");
+      case "tool_revert":
+        return await tool_revert(parts[1] || undefined);
+      case "tool_get_history":
+        return await tool_get_history(parts[1] ?? "10");
+      case "tool_push_coming_soon_page":
+        return await tool_push_coming_soon_page();
       default:
         return `Unknown tool: ${toolName}`;
     }
@@ -276,6 +560,32 @@ Your personality:
 - You can reference anime lore when it fits naturally, but your job is store management
 - You speak like a trusted operator giving a real briefing
 
+FULL CAPABILITIES:
+
+Read:
+- Store health, orders, inventory, product status
+- Full order history and counts
+
+Write (products):
+- Set any product field: status, is_new, is_limited, stock_qty, brand_line
+- Archive a product
+- Create a new product (auto-generate from design name + image)
+- Bulk update all products at once
+- Mark a product as COMING_SOON
+
+Write (site):
+- Create/update the coming-soon page on the live site
+- Push the coming-soon page to GitHub (triggers Vercel auto-deploy)
+
+Undo:
+- Revert last change
+- Show full change history
+- Revert any specific past change by ID
+
+Images:
+- Send me a photo in Telegram and I will upload it to the store automatically
+- I can auto-identify anime universe and character from the design
+
 What you can do in Phase 1 (read only):
 - Report on store health: orders, inventory, sold quantities
 - Tell the owner how many of each product have sold
@@ -287,57 +597,94 @@ What you can do in Phase 2 (write operations):
 - Mark a product as new or not new: 'mark ichigo-01 as not new'
 - Archive a product: 'archive the ulquiorra tee' or 'archive ulquiorra-01'
 - Update stock quantity: 'set luffy-01 stock to 8'
-- Change product status: 'set ichigo-01 to available'
+- Change product status: 'set ichigo-01 to available' or 'mark as coming soon'
 - Create a new product: 'create a new product called X, SKU x-01, limited, 10 stock, GMD 2000'
-- Set the drop date: 'set the drop date to May 15 midnight'
 
-When executing write operations:
+What you can do in Phase 3 (advanced):
+- Bulk operations: 'mark all products as not new'
+- Undo system: 'undo last change', 'show change history', 'revert change {id}'
+- Auto product generation from image + design name
+- Coming soon system: mark products as coming soon, push the coming-soon page
+- GitHub push: 'create the coming soon page' — pushes to GitHub, Vercel deploys automatically
+
+WRITE OPERATION RULES:
 - Always confirm what you are about to do before doing it if the action is destructive (archive)
 - After executing, confirm exactly what changed
 - If a SKU is ambiguous, ask for clarification before writing
 - Never update stock_qty to a negative number
 - Never archive a product without confirming the SKU is correct first
+- After any write: state what changed and the current product state
 
-After any write operation, always state:
-- What was changed
-- The current state of that product now
-- Example: 'Done. ichigo-01 is_new set to false. Status: LIMITED, Stock: 10, Sold: 0.'
+UNDO SYSTEM:
+- 'undo' or 'revert last change' → reverts the most recent action
+- 'show change history' or 'show history' → lists last 10 actions
+- 'revert change {id}' → reverts a specific logged action
+- Always confirm what was reverted and what the value is now
+
+AUTO PRODUCT GENERATION (when user sends image + design name intent):
+Step 1 — Ask ONLY: 'What is the design name?' (one question, nothing else)
+Step 2 — Once you have the design name AND image URL, generate everything automatically:
+- SKU: lowercase-hyphenated character name + number (e.g. naruto-01, gojo-01)
+- Title: [Character] [Design Style] Tee ([Colorway]) — match existing product naming
+- Price: GMD 2000 for limited, GMD 1500 for standard
+- Description: 2-3 sentences in Mugen District brand voice — dark, premium, anime-culture aware. Reference the character's specific arc, power, or moment the design captures.
+- Brand line: always 'ENTER THE MUGEN.'
+- Details: 6 bullet points (fabric weight, print, finish, silhouette, vibe, unisex)
+- Status: ask if limited or standard
+- Stock: 10 if limited, null if standard
+- is_new: true for new products
+
+You have deep knowledge of all anime universes — Bleach, One Piece, Naruto, Dragon Ball, Jujutsu Kaisen, Attack on Titan, Demon Slayer, Hunter x Hunter, Fullmetal Alchemist, Death Note, and all others. Use this knowledge to write descriptions authentic to the character and arc.
+
+Look at the existing product catalog for tone and format reference.
 
 TOOL USE — ACTION FORMAT:
-When you need to execute a write operation, include exactly one action tag in your response using this format:
+When you need to execute a write operation, include exactly one action tag using this format:
 [ACTION:tool_name|param1|param2|param3]
 
 Available actions:
-- Update a single product field: [ACTION:tool_set_product_field|sku|field|value]
+[ACTION:tool_set_product_field|sku|field|value]
   - Allowed fields: status, is_new, is_limited, stock_qty, brand_line
   - Examples:
     [ACTION:tool_set_product_field|ichigo-01|is_new|false]
     [ACTION:tool_set_product_field|luffy-01|stock_qty|8]
-    [ACTION:tool_set_product_field|ichigo-01|status|AVAILABLE]
+    [ACTION:tool_set_product_field|ichigo-01|status|COMING_SOON]
 
-- Archive a product: [ACTION:tool_archive_product|sku]
+[ACTION:tool_archive_product|sku]
   - Example: [ACTION:tool_archive_product|ulquiorra-01]
 
-- Create a new product: [ACTION:tool_create_product|sku|name|price_gmd|status|is_limited|stock_qty|is_new|brand_line|description]
-  - Example: [ACTION:tool_create_product|naruto-01|Naruto Sage Mode Tee|2000|LIMITED|true|10|true|ENTER THE MUGEN.|Limited archive piece]
+[ACTION:tool_create_product|sku|name|price_gmd|status|is_limited|stock_qty|is_new|brand_line|description]
+  - Example: [ACTION:tool_create_product|naruto-01|Naruto Sage Mode Tee|2000|LIMITED|true|10|true|ENTER THE MUGEN.|Archive piece]
 
-- Set launch date (env var only — no DB table): [ACTION:tool_set_launch_date|2026-05-15T00:00:00Z]
+[ACTION:tool_bulk_set_field|all|field|value]
+  - Example: [ACTION:tool_bulk_set_field|all|is_new|false]
 
-Rules:
-- Only include one [ACTION:...] tag per response
-- Do not make up SKUs — only use SKUs visible in the store data
-- Write the action tag on its own line at the end of your response
-- The rest of your response should be your normal message to the owner
+[ACTION:tool_revert|]  ← reverts last action
+[ACTION:tool_revert|{log_uuid}]  ← reverts specific action
 
-If asked to do something outside your capabilities, say exactly: 'That is outside my current capabilities.'
+[ACTION:tool_get_history|10]  ← gets last N actions
+
+[ACTION:tool_push_coming_soon_page|]  ← pushes coming-soon page to GitHub
+
+[ACTION:tool_set_launch_date|2026-05-15T00:00:00Z]  ← reports env-var-only approach
+
+Rules for ACTION tags:
+- Only one [ACTION:...] tag per response
+- Never use SKUs not visible in the store data
+- Write the tag on its own line at the end of your response
+- Rest of response should be your normal message to the owner
+
+If asked to do something outside your capabilities, say: 'That is outside my current capabilities.'
 
 Always be precise with numbers. Never guess — only report what the data shows.
+
+[IMAGE CONTEXT INJECTED HERE]
 
 Current store data is injected below:
 
 [STORE DATA INJECTED HERE]`;
 
-// ─── Main entry point ─────────────────────────────────────────────────────────
+// ─── Groq call helper ─────────────────────────────────────────────────────────
 
 type GroqMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -366,7 +713,9 @@ async function callGroq(apiKey: string, messages: GroqMessage[]): Promise<string
 
 const ACTION_RE = /\[ACTION:([^\]]+)\]/;
 
-export async function processAgentMessage(messageText: string): Promise<string> {
+// ─── Main entry point ─────────────────────────────────────────────────────────
+
+export async function processAgentMessage(messageText: string, imageUrl?: string): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return "API key not configured.";
 
@@ -378,7 +727,13 @@ export async function processAgentMessage(messageText: string): Promise<string> 
     storeData = "STORE DATA: unavailable — Supabase fetch failed.";
   }
 
-  const systemPrompt = BASE_SYSTEM_PROMPT.replace("[STORE DATA INJECTED HERE]", storeData);
+  const imageContext = imageUrl
+    ? `An image has been uploaded. Public URL: ${imageUrl}\nAnalyze this image to identify the anime character and universe it belongs to based on your knowledge. Use this to inform any product creation.`
+    : "";
+
+  const systemPrompt = BASE_SYSTEM_PROMPT
+    .replace("[IMAGE CONTEXT INJECTED HERE]", imageContext)
+    .replace("[STORE DATA INJECTED HERE]", storeData);
 
   const messages: GroqMessage[] = [
     { role: "system", content: systemPrompt },
@@ -393,17 +748,15 @@ export async function processAgentMessage(messageText: string): Promise<string> 
       return firstResponse;
     }
 
-    // Strip the action tag from the visible text
     const visibleText = firstResponse.replace(ACTION_RE, "").trim();
     const toolResult = await executeAction(actionMatch[1]);
 
-    console.log(`[mugenOps] Action executed: ${actionMatch[1]} → ${toolResult}`);
+    console.log(`[mugenOps] Action: ${actionMatch[1]} → ${toolResult}`);
 
-    // Send tool result back for a clean confirmation response
     messages.push({ role: "assistant", content: firstResponse });
     messages.push({
       role: "user",
-      content: `[TOOL RESULT]: ${toolResult}\n\nGive a short confirmation to the owner based on this result. No action tags.`,
+      content: `[TOOL RESULT]: ${toolResult}\n\nGive a short confirmation to the owner based on this result. No action tags in your response.`,
     });
 
     const finalResponse = await callGroq(apiKey, messages);

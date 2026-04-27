@@ -103,6 +103,7 @@ export function cartItemToProductSnapshot(item: CartItem): Product {
     availableQty: available,
     soldOut: Boolean(item.product.soldOut),
     isNew: false,
+    comingSoon: false,
     category: isLimited ? "limited" : "all",
     description: "",
     details: [],

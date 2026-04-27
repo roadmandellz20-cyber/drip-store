@@ -17,6 +17,7 @@ export type Product = {
   availableQty: number | null;
   soldOut: boolean;
   isNew: boolean;
+  comingSoon: boolean;
   category: "all" | "new" | "limited";
   description: string;
   details: string[];
@@ -80,6 +81,7 @@ function buildInventoryDefaults(limited: boolean) {
     available: limited ? LIMITED_STOCK_QTY : null,
     availableQty: limited ? LIMITED_STOCK_QTY : null,
     soldOut: false,
+    comingSoon: false,
   };
 }
 

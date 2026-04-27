@@ -45,7 +45,7 @@ export default function ProductCard({
   const warmedRef = useRef(false);
 
   const { soldOutUi, scarcityText } = getProductUiState(product, launchLive);
-  const addDisabled = !launchLive || soldOutUi;
+  const addDisabled = !launchLive || soldOutUi || product.comingSoon;
   const showLaunchNote = product.isLimited && !launchLive;
   const hoverSwapEnabled = hasDistinctLookImage(product);
   const cardBrandLine =
@@ -97,7 +97,11 @@ export default function ProductCard({
     >
       <div className="p-card__frame">
         <div className="p-card__status">
-          <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
+          {product.comingSoon ? (
+            <span className="chip chip--limited">COMING SOON</span>
+          ) : (
+            <span className="chip chip--ghost">{product.isNew ? "NEW DROP" : "ARCHIVE PRINT"}</span>
+          )}
         </div>
 
         <Link
@@ -174,7 +178,7 @@ export default function ProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
+              {product.comingSoon ? "COMING SOON" : soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

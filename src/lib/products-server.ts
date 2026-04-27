@@ -155,6 +155,7 @@ function normalizeProductRow(row: ProductRow): Product | null {
     availableQty: available,
     soldOut: isLimited && available !== null && available <= 0,
     isNew,
+    comingSoon: statusRaw === "COMING_SOON",
     category: deriveCategory(isNew, isLimited),
     description: asMultiline(row.description, 5000) || legacy?.description || "",
     details: normalizeDetails(row.details, legacy?.details || []),
@@ -282,4 +283,30 @@ export async function fetchRelatedProducts(
   const fallback = candidates.filter((product) => !preferredSkus.has(product.sku));
 
   return [...preferred, ...fallback].slice(0, count);
+}
+
+export async function fetchComingSoonProducts() {
+  const supabaseAdmin = await loadSupabaseAdmin();
+  if (!supabaseAdmin) return [];
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .select("*")
+      .eq("status", "COMING_SOON")
+      .eq("is_active", true);
+
+    if (error) {
+      console.error("[products-server] fetchComingSoonProducts error", error.message);
+      return [];
+    }
+
+    const rows = sortProductRows((data as ProductRow[] | null) || []);
+    return rows
+      .map((row) => normalizeProductRow(row))
+      .filter((product): product is Product => product !== null);
+  } catch (err) {
+    console.error("[products-server] fetchComingSoonProducts failed", err);
+    return [];
+  }
 }
