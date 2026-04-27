@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     if (!imageUrl) {
       await sendMessage(chatId, "Image received but upload to storage failed. Check that the product-images bucket exists in Supabase.");
     } else {
-      const reply = await processAgentMessage(caption, imageUrl);
+      const reply = await processAgentMessage(caption, chatId, imageUrl);
       await sendMessage(chatId, reply);
     }
 
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const reply = await processAgentMessage(message.text);
+  const reply = await processAgentMessage(message.text, chatId);
   await sendMessage(chatId, reply);
 
   return new Response(JSON.stringify({ ok: true }), {

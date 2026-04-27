@@ -4,6 +4,16 @@ const MODEL = "llama-3.3-70b-versatile";
 const MAX_TOKENS = 800;
 
 const ALLOWED_PRODUCT_FIELDS = ["status", "is_new", "is_limited", "stock_qty", "brand_line"] as const;
+
+// ─── Pending confirmation state (module-level, survives within a warm serverless instance) ──
+
+type PendingProductCreate = {
+  actionStr: string;
+  imageUrl: string;
+  summary: string;
+};
+
+const pendingProducts = new Map<string, PendingProductCreate>();
 type AllowedField = (typeof ALLOWED_PRODUCT_FIELDS)[number];
 
 const VALID_STATUSES = ["AVAILABLE", "LIMITED", "ARCHIVED", "COMING_SOON"] as const;
@@ -110,7 +120,8 @@ async function tool_create_product(
   stock_qty: string,
   is_new: string,
   brand_line: string,
-  description: string
+  description: string,
+  imageUrl = ""
 ): Promise<string> {
   const { data: existing } = await supabaseAdmin
     .from("products")
@@ -142,7 +153,7 @@ async function tool_create_product(
     title: name,
     description: description || "",
     brand_line: brand_line || "ENTER THE MUGEN.",
-    image_url: "",
+    image_url: imageUrl || "",
     price_cents: priceGmd * 100,
     currency: "GMD",
     status: statusUpper,
@@ -417,6 +428,42 @@ export default async function ComingSoonPage() {
   }
 
   return `Coming soon page pushed to GitHub. Vercel deploying now — live in ~2 minutes at mugendistrict.com/coming-soon`;
+}
+
+// ─── Confirmation helpers ─────────────────────────────────────────────────────
+
+function buildCreateSummary(parts: string[], imageUrl: string): string {
+  const [, sku, name, price_gmd, status, is_limited, stock_qty, is_new, brand_line, description] = parts;
+  const price = parseInt(price_gmd || "0", 10);
+  const limited = is_limited === "true" || is_limited === "1";
+  const stock = !limited ? "unlimited" : (stock_qty === "null" || !stock_qty ? "unlimited" : stock_qty);
+  const isNew = is_new === "true" || is_new === "1";
+
+  return [
+    "Here's what I'll create:",
+    "",
+    `SKU: ${sku}`,
+    `Title: ${name}`,
+    `Price: GMD ${price.toLocaleString()}`,
+    `Status: ${(status || "AVAILABLE").toUpperCase()}`,
+    `Stock: ${stock}`,
+    `New: ${isNew ? "yes" : "no"}`,
+    `Brand line: ${brand_line || "ENTER THE MUGEN."}`,
+    description ? `Description: ${description.slice(0, 150)}${description.length > 150 ? "..." : ""}` : "",
+    imageUrl ? `Image: ${imageUrl}` : "Image: none",
+    "",
+    "Reply YES to confirm or NO to cancel.",
+  ].filter(Boolean).join("\n");
+}
+
+async function executePendingCreate(pending: PendingProductCreate): Promise<string> {
+  const parts = pending.actionStr.split("|");
+  return await tool_create_product(
+    parts[1] ?? "", parts[2] ?? "", parts[3] ?? "",
+    parts[4] ?? "AVAILABLE", parts[5] ?? "false", parts[6] ?? "null",
+    parts[7] ?? "false", parts[8] ?? "", parts[9] ?? "",
+    pending.imageUrl
+  );
 }
 
 // ─── ACTION executor ──────────────────────────────────────────────────────────
@@ -715,9 +762,27 @@ const ACTION_RE = /\[ACTION:([^\]]+)\]/;
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export async function processAgentMessage(messageText: string, imageUrl?: string): Promise<string> {
+export async function processAgentMessage(messageText: string, chatId: string | number, imageUrl?: string): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return "API key not configured.";
+
+  const pendingKey = String(chatId);
+
+  // Check for pending product confirmation first
+  const pending = pendingProducts.get(pendingKey);
+  if (pending) {
+    const normalized = messageText.toLowerCase().trim();
+    if (normalized === "yes" || normalized === "y" || normalized === "confirm") {
+      pendingProducts.delete(pendingKey);
+      const result = await executePendingCreate(pending);
+      return result;
+    } else if (normalized === "no" || normalized === "n" || normalized === "cancel") {
+      pendingProducts.delete(pendingKey);
+      return "Cancelled. No product was created.";
+    } else {
+      return `Pending confirmation:\n\n${pending.summary}`;
+    }
+  }
 
   let storeData: string;
   try {
@@ -748,9 +813,18 @@ export async function processAgentMessage(messageText: string, imageUrl?: string
       return firstResponse;
     }
 
+    const parts = actionMatch[1].split("|");
     const visibleText = firstResponse.replace(ACTION_RE, "").trim();
-    const toolResult = await executeAction(actionMatch[1]);
 
+    // Intercept product creation — require explicit confirmation before inserting
+    if (parts[0] === "tool_create_product") {
+      const summary = buildCreateSummary(parts, imageUrl ?? "");
+      pendingProducts.set(pendingKey, { actionStr: actionMatch[1], imageUrl: imageUrl ?? "", summary });
+      return visibleText ? `${visibleText}\n\n${summary}` : summary;
+    }
+
+    // All other actions execute immediately
+    const toolResult = await executeAction(actionMatch[1]);
     console.log(`[mugenOps] Action: ${actionMatch[1]} → ${toolResult}`);
 
     messages.push({ role: "assistant", content: firstResponse });
