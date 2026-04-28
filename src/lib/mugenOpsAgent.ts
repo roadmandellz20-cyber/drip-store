@@ -581,6 +581,237 @@ async function tool_remove_coming_soon_page(): Promise<string> {
   return `Coming soon pulled from nav. Page still exists but it's off the menu.`;
 }
 
+// ─── Generic page creation / removal ─────────────────────────────────────────
+
+async function tool_create_page(pageName: string, pageDescription: string, content: string): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!token || !owner || !repo) {
+    return `GitHub env vars not set. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel environment variables.`;
+  }
+  if (!apiKey) return `API key not configured.`;
+
+  const slug = pageName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  if (!slug) return `Invalid page name.`;
+
+  const ghHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+  };
+
+  async function readGitHubFile(path: string): Promise<string> {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, { headers: ghHeaders });
+      if (!res.ok) return `[Could not read ${path}]`;
+      const data = (await res.json()) as { content: string };
+      return Buffer.from(data.content, "base64").toString("utf-8");
+    } catch {
+      return `[Could not read ${path}]`;
+    }
+  }
+
+  // Step 1: Read design system context from GitHub
+  const [globalsCSS, aboutPage] = await Promise.all([
+    readGitHubFile("src/app/globals.css"),
+    readGitHubFile("src/app/about/page.tsx"),
+  ]);
+
+  const cssContext = globalsCSS.slice(0, 2500);
+  const pageReference = aboutPage.slice(0, 3000);
+
+  // Step 2: Generate the page with Groq
+  const label = slug.replace(/-/g, " ").toUpperCase();
+  const genMessages: GroqMessage[] = [
+    {
+      role: "system",
+      content: `You are building a new Next.js App Router page for Mugen District — a premium anime-inspired streetwear label.
+
+REFERENCE PAGE (about/page.tsx — copy this structure and style exactly):
+\`\`\`tsx
+${pageReference}
+\`\`\`
+
+CSS VARIABLES AND KEY DESIGN CLASSES:
+\`\`\`css
+${cssContext}
+\`\`\`
+
+RULES:
+- Use the exact same component patterns as the reference page
+- Reuse these classes: .page, .page__head, .page__kicker, .page__title, .page__sub, .page__actions, .section, .section__title, .section__text, .section__text--muted, .list, .list__item, .list__label, .list__text, .divider, .btn.btn--primary, .btn.btn--ghost
+- The layout (nav + footer) wraps automatically — do NOT add any layout wrapper
+- Dark, premium, intentional tone — this is Mugen District, not a generic storefront
+- Use "use client" only if the page genuinely needs client-side interactivity
+- Metadata title should follow the pattern: "[Page Title] | MUGEN DISTRICT"
+- All headings uppercase
+- Output ONLY the raw TypeScript/TSX code — no markdown fences, no explanation`,
+    },
+    {
+      role: "user",
+      content: `Build a new page for: ${pageDescription}
+Page route: /${slug}
+Content to include: ${content || "none specified"}
+
+Generate the complete src/app/${slug}/page.tsx file.`,
+    },
+  ];
+
+  const generated = await callGroq(apiKey, genMessages, 2000);
+
+  const cleanedPage = generated
+    .replace(/^```(?:tsx?|jsx?|typescript|javascript)?\n?/m, "")
+    .replace(/\n?```\s*$/m, "")
+    .trim();
+
+  if (!cleanedPage || cleanedPage.length < 50) {
+    return `Page generation failed — model returned empty output. Try again.`;
+  }
+
+  // Step 3: Push the page to GitHub
+  const pagePath = `src/app/${slug}/page.tsx`;
+  const pageApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${pagePath}`;
+
+  let pageSha: string | undefined;
+  try {
+    const existsRes = await fetch(pageApiUrl, { headers: ghHeaders });
+    if (existsRes.ok) {
+      const existsData = (await existsRes.json()) as { sha?: string };
+      pageSha = existsData.sha;
+    }
+  } catch {
+    // File doesn't exist — will create
+  }
+
+  const pageBody: Record<string, unknown> = {
+    message: `feat: add /${slug} page via MUGEN OPS`,
+    content: Buffer.from(cleanedPage).toString("base64"),
+    branch: "main",
+  };
+  if (pageSha) pageBody.sha = pageSha;
+
+  const pageRes = await fetch(pageApiUrl, {
+    method: "PUT",
+    headers: ghHeaders,
+    body: JSON.stringify(pageBody),
+  });
+
+  if (!pageRes.ok) {
+    const errText = await pageRes.text().catch(() => "");
+    return `Page push failed (${pageRes.status}): ${errText.slice(0, 200)}. Nav was not updated.`;
+  }
+
+  // Step 4: Update nav (Header.tsx)
+  const navPath = "src/components/Header.tsx";
+  const navApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${navPath}`;
+
+  const navReadRes = await fetch(navApiUrl, { headers: ghHeaders });
+  if (!navReadRes.ok) {
+    const errText = await navReadRes.text().catch(() => "");
+    return `Page pushed. Nav read failed (${navReadRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  const navData = (await navReadRes.json()) as { sha: string; content: string };
+  const currentNavContent = Buffer.from(navData.content, "base64").toString("utf-8");
+
+  if (currentNavContent.includes(`href: "/${slug}"`)) {
+    return `${label} page is live. Nav already has the link. Vercel's deploying — 2 minutes.`;
+  }
+
+  const updatedNavContent = currentNavContent.replace(
+    `  { href: "/store", label: "ALL PRODUCTS" },`,
+    `  { href: "/${slug}", label: "${label}" },\n  { href: "/store", label: "ALL PRODUCTS" },`
+  );
+
+  if (updatedNavContent === currentNavContent) {
+    return `Page pushed at /${slug}. Couldn't find nav insertion point — add the link manually to Header.tsx.`;
+  }
+
+  const navPushRes = await fetch(navApiUrl, {
+    method: "PUT",
+    headers: ghHeaders,
+    body: JSON.stringify({
+      message: `feat: add /${slug} nav link via MUGEN OPS`,
+      content: Buffer.from(updatedNavContent).toString("base64"),
+      sha: navData.sha,
+      branch: "main",
+    }),
+  });
+
+  if (!navPushRes.ok) {
+    const errText = await navPushRes.text().catch(() => "");
+    return `Page pushed. Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  return `${label} page is live and in the nav. Vercel's deploying — 2 minutes.`;
+}
+
+async function tool_remove_page(pageName: string): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+
+  if (!token || !owner || !repo) {
+    return `GitHub env vars not set. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel environment variables.`;
+  }
+
+  const slug = pageName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  if (!slug) return `Invalid page name.`;
+
+  const ghHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+  };
+
+  const navPath = "src/components/Header.tsx";
+  const navApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${navPath}`;
+
+  const navReadRes = await fetch(navApiUrl, { headers: ghHeaders });
+  if (!navReadRes.ok) {
+    const errText = await navReadRes.text().catch(() => "");
+    return `Nav read failed (${navReadRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  const navData = (await navReadRes.json()) as { sha: string; content: string };
+  const currentNavContent = Buffer.from(navData.content, "base64").toString("utf-8");
+
+  if (!currentNavContent.includes(`href: "/${slug}"`)) {
+    return `/${slug} isn't in the nav — nothing to remove.`;
+  }
+
+  const updatedNavContent = currentNavContent
+    .split("\n")
+    .filter((line) => !line.includes(`href: "/${slug}"`))
+    .join("\n");
+
+  if (updatedNavContent === currentNavContent) {
+    return `Couldn't cleanly remove /${slug} from nav — check Header.tsx manually.`;
+  }
+
+  const navPushRes = await fetch(navApiUrl, {
+    method: "PUT",
+    headers: ghHeaders,
+    body: JSON.stringify({
+      message: `feat: remove /${slug} nav link via MUGEN OPS`,
+      content: Buffer.from(updatedNavContent).toString("base64"),
+      sha: navData.sha,
+      branch: "main",
+    }),
+  });
+
+  if (!navPushRes.ok) {
+    const errText = await navPushRes.text().catch(() => "");
+    return `Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  const label = slug.replace(/-/g, " ");
+  return `${label} pulled from nav. Page file still exists if you want to bring it back.`;
+}
+
 // ─── Confirmation helpers ─────────────────────────────────────────────────────
 
 function buildCreateSummary(parts: string[], imageUrl: string): string {
@@ -653,6 +884,10 @@ async function executeAction(actionStr: string): Promise<string> {
         return await tool_push_coming_soon_page(parts[1] || undefined);
       case "tool_remove_coming_soon_page":
         return await tool_remove_coming_soon_page();
+      case "tool_create_page":
+        return await tool_create_page(parts[1] ?? "", parts[2] ?? "", parts[3] ?? "");
+      case "tool_remove_page":
+        return await tool_remove_page(parts[1] ?? "");
       default:
         return `Unknown tool: ${toolName}`;
     }
@@ -901,6 +1136,24 @@ You remember context within the session. You reference earlier parts of the conv
 
 You are not afraid of silence. If they say 'k' or 'cool' you don't need to fill the air with extra commentary.
 
+PAGE CREATION
+
+You can build and deploy any new page on the Mugen District site directly from this chat.
+
+When the founder says 'create a [page] page' or 'add a [page] page':
+- If the purpose isn't clear, ask one question: what should it do or say?
+- Then execute tool_create_page — it reads the live site design, generates the page matching the exact UI, and pushes it live with a nav link automatically
+
+When the founder says 'remove the [page] page':
+- Confirm what you're about to do
+- Execute tool_remove_page — nav link disappears, page file stays in case they want it back
+
+Examples:
+'create a discount page' → tool_create_page|discount|Special pricing page for Mugen District|discount codes, selected archive pieces
+'add a lookbook page' → tool_create_page|lookbook|Visual archive of all Mugen District campaigns|campaign imagery, drop archive
+'remove the coming soon page' → tool_remove_page|coming-soon
+'create a collab page' → tool_create_page|collab|Collaboration announcements and partner drops|upcoming collabs, partner info
+
 WHAT YOU NEVER DO
 
 - Break character
@@ -954,6 +1207,9 @@ Available actions:
 
 [ACTION:tool_remove_coming_soon_page|]        ← removes COMING SOON from nav (page file stays)
 
+[ACTION:tool_create_page|pageName|pageDescription|content]  ← generates a new page + adds nav link
+[ACTION:tool_remove_page|pageName]                          ← removes page's nav link (page file stays)
+
 [ACTION:tool_set_launch_date|2026-05-15T00:00:00Z]  ← reports env-var-only approach
 
 Rules for ACTION tags:
@@ -992,14 +1248,14 @@ Current store data is injected below:
 
 type GroqMessage = { role: "system" | "user" | "assistant"; content: string };
 
-async function callGroq(apiKey: string, messages: GroqMessage[]): Promise<string> {
+async function callGroq(apiKey: string, messages: GroqMessage[], maxTokens = MAX_TOKENS): Promise<string> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({ model: MODEL, max_tokens: MAX_TOKENS, messages }),
+    body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages }),
   });
 
   if (!res.ok) {
