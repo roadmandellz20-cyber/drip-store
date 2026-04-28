@@ -1,10 +1,15 @@
 export const runtime = "nodejs";
 
-import { processAgentMessage } from "@/lib/mugenOpsAgent";
+import { processAgentMessage, handleProductFlow } from "@/lib/mugenOpsAgent";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "";
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID ?? "";
+
+const OK = new Response(JSON.stringify({ ok: true }), {
+  status: 200,
+  headers: { "Content-Type": "application/json" },
+});
 
 async function sendMessage(chatId: number | string, text: string) {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -44,7 +49,7 @@ async function uploadPhotoToSupabase(imageBuffer: Buffer, filename: string): Pro
   return urlData.publicUrl;
 }
 
-async function handlePhoto(photo: Array<{ file_id: string; file_size?: number }>): Promise<string | null> {
+async function downloadPhoto(photo: Array<{ file_id: string; file_size?: number }>): Promise<string | null> {
   try {
     const largest = photo[photo.length - 1];
     const fileRes = await fetch(
@@ -94,54 +99,46 @@ export async function POST(request: Request) {
   };
 
   const message = update.message;
-  if (!message) {
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  if (!message) return OK;
 
   const chatId = message.chat.id;
 
   if (ADMIN_CHAT_ID && String(chatId) !== String(ADMIN_CHAT_ID)) {
     await sendMessage(chatId, "Access denied.");
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return OK;
   }
 
-  // Handle photo messages
+  // ── Photo messages: upload then hand off to flow handler ─────────────────
+
   if (message.photo && message.photo.length > 0) {
-    const imageUrl = await handlePhoto(message.photo);
-    const caption = message.caption?.trim() || "I just sent an image. What should I do with it?";
+    const imageUrl = await downloadPhoto(message.photo);
 
     if (!imageUrl) {
       await sendMessage(chatId, "Image received but upload to storage failed. Check that the product-images bucket exists in Supabase.");
-    } else {
-      const reply = await processAgentMessage(caption, chatId, imageUrl);
-      await sendMessage(chatId, reply);
+      return OK;
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const caption = message.caption?.trim() || "";
+    const reply = await handleProductFlow(caption, chatId, imageUrl);
+    await sendMessage(chatId, reply ?? "Image uploaded. What should I do with it?");
+    return OK;
   }
 
-  // Handle text messages
-  if (!message.text) {
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+  // ── Text messages: check flow state first ────────────────────────────────
+
+  if (!message.text) return OK;
+
+  const text = message.text;
+
+  // If there's an active product creation flow, handle it entirely in the flow handler.
+  // Only fall through to processAgentMessage when no flow is active.
+  const flowReply = await handleProductFlow(text, chatId);
+  if (flowReply !== null) {
+    await sendMessage(chatId, flowReply);
+    return OK;
   }
 
-  const reply = await processAgentMessage(message.text, chatId);
+  const reply = await processAgentMessage(text, chatId);
   await sendMessage(chatId, reply);
-
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return OK;
 }
