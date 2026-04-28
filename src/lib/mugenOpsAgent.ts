@@ -409,15 +409,22 @@ async function tool_push_coming_soon_page(sku?: string): Promise<string> {
     console.log(`[mugenOps] Marked ${sku} as COMING_SOON, pushing page to GitHub`);
   }
 
-  const path = "src/app/coming-soon/page.tsx";
-  const content = `import type { Metadata } from "next";
+  const ghHeaders = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+  };
+
+  // ── File 1: coming-soon page ──────────────────────────────────────────────────
+  const pagePath = "src/app/coming-soon/page.tsx";
+  const pageContent = `import type { Metadata } from "next";
 import ProductGrid from "@/components/ProductGrid";
 import { fetchComingSoonProducts } from "@/lib/products-server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Coming Soon — Next Archive",
-  description: "The next drop is loading. Mugen District.",
+  title: "Coming Soon — Next Archive | MUGEN DISTRICT",
+  description: "The next archive is being assembled. Mugen District.",
   alternates: { canonical: "/coming-soon" },
 };
 
@@ -427,11 +434,11 @@ export default async function ComingSoonPage() {
   return (
     <div className="page">
       <div className="page__head">
+        <p className="page__kicker">NEXT ARCHIVE</p>
         <h1 className="page__title">COMING SOON</h1>
-        <p className="page__sub">Next archive. Incoming.</p>
       </div>
       {products.length === 0 ? (
-        <p className="page__empty">Nothing confirmed yet. Stay locked.</p>
+        <p className="page__empty">THE NEXT ARCHIVE IS BEING ASSEMBLED.</p>
       ) : (
         <ProductGrid products={products} priorityCount={0} />
       )}
@@ -440,45 +447,138 @@ export default async function ComingSoonPage() {
 }
 `;
 
-  const encoded = Buffer.from(content).toString("base64");
-  const apiBase = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-  const headers = {
+  const pageApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${pagePath}`;
+  let pageSha: string | undefined;
+  try {
+    const existsRes = await fetch(pageApiUrl, { headers: ghHeaders });
+    if (existsRes.ok) {
+      const existsData = (await existsRes.json()) as { sha?: string };
+      pageSha = existsData.sha;
+    }
+  } catch {
+    // File doesn't exist — will create
+  }
+
+  const pageBody: Record<string, unknown> = {
+    message: "feat: update coming-soon page via MUGEN OPS",
+    content: Buffer.from(pageContent).toString("base64"),
+    branch: "main",
+  };
+  if (pageSha) pageBody.sha = pageSha;
+
+  const pageRes = await fetch(pageApiUrl, {
+    method: "PUT",
+    headers: ghHeaders,
+    body: JSON.stringify(pageBody),
+  });
+
+  if (!pageRes.ok) {
+    const errText = await pageRes.text().catch(() => "");
+    return `Page push failed (${pageRes.status}): ${errText.slice(0, 200)}. Nav was not updated.`;
+  }
+
+  // ── File 2: add COMING SOON to nav (Header.tsx) ───────────────────────────────
+  const navPath = "src/components/Header.tsx";
+  const navApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${navPath}`;
+
+  const navReadRes = await fetch(navApiUrl, { headers: ghHeaders });
+  if (!navReadRes.ok) {
+    const errText = await navReadRes.text().catch(() => "");
+    return `Page pushed. Nav read failed (${navReadRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  const navData = (await navReadRes.json()) as { sha: string; content: string };
+  const currentNavContent = Buffer.from(navData.content, "base64").toString("utf-8");
+
+  if (currentNavContent.includes('href: "/coming-soon"')) {
+    return `Coming soon page pushed. Nav already has the COMING SOON link — no nav update needed. Vercel deploying now — give it 2 minutes.`;
+  }
+
+  const updatedNavContent = currentNavContent.replace(
+    `  { href: "/about", label: "ABOUT" },`,
+    `  { href: "/coming-soon", label: "COMING SOON" },\n  { href: "/about", label: "ABOUT" },`
+  );
+
+  if (updatedNavContent === currentNavContent) {
+    return `Coming soon page pushed. Nav update skipped — couldn't find the insertion point. Add the link manually.`;
+  }
+
+  const navPushRes = await fetch(navApiUrl, {
+    method: "PUT",
+    headers: ghHeaders,
+    body: JSON.stringify({
+      message: "feat: add coming-soon nav link via MUGEN OPS",
+      content: Buffer.from(updatedNavContent).toString("base64"),
+      sha: navData.sha,
+      branch: "main",
+    }),
+  });
+
+  if (!navPushRes.ok) {
+    const errText = await navPushRes.text().catch(() => "");
+    return `Coming soon page pushed. Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+  }
+
+  return `Coming soon page is live and nav is updated. Vercel's deploying now — give it 2 minutes.`;
+}
+
+async function tool_remove_coming_soon_page(): Promise<string> {
+  const token = process.env.GITHUB_TOKEN;
+  const owner = process.env.GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO;
+
+  if (!token || !owner || !repo) {
+    return `GitHub env vars not set. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel environment variables.`;
+  }
+
+  const ghHeaders = {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
   };
 
-  // Check if file already exists (need SHA for update)
-  let sha: string | undefined;
-  try {
-    const existsRes = await fetch(apiBase, { headers });
-    if (existsRes.ok) {
-      const existsData = (await existsRes.json()) as { sha?: string };
-      sha = existsData.sha;
-    }
-  } catch {
-    // File doesn't exist — create it
+  const navPath = "src/components/Header.tsx";
+  const navApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${navPath}`;
+
+  const navReadRes = await fetch(navApiUrl, { headers: ghHeaders });
+  if (!navReadRes.ok) {
+    const errText = await navReadRes.text().catch(() => "");
+    return `Nav read failed (${navReadRes.status}): ${errText.slice(0, 200)}.`;
   }
 
-  const body: Record<string, unknown> = {
-    message: "feat: update coming-soon page via MUGEN OPS",
-    content: encoded,
-    branch: "main",
-  };
-  if (sha) body.sha = sha;
+  const navData = (await navReadRes.json()) as { sha: string; content: string };
+  const currentNavContent = Buffer.from(navData.content, "base64").toString("utf-8");
 
-  const pushRes = await fetch(apiBase, {
+  if (!currentNavContent.includes('href: "/coming-soon"')) {
+    return `COMING SOON link isn't in the nav — nothing to remove.`;
+  }
+
+  const updatedNavContent = currentNavContent.replace(
+    `  { href: "/coming-soon", label: "COMING SOON" },\n  { href: "/about", label: "ABOUT" },`,
+    `  { href: "/about", label: "ABOUT" },`
+  );
+
+  if (updatedNavContent === currentNavContent) {
+    return `Couldn't cleanly remove the nav link — check Header.tsx manually.`;
+  }
+
+  const navPushRes = await fetch(navApiUrl, {
     method: "PUT",
-    headers,
-    body: JSON.stringify(body),
+    headers: ghHeaders,
+    body: JSON.stringify({
+      message: "feat: remove coming-soon nav link via MUGEN OPS",
+      content: Buffer.from(updatedNavContent).toString("base64"),
+      sha: navData.sha,
+      branch: "main",
+    }),
   });
 
-  if (!pushRes.ok) {
-    const errText = await pushRes.text().catch(() => "");
-    return `GitHub push failed (${pushRes.status}): ${errText.slice(0, 200)}`;
+  if (!navPushRes.ok) {
+    const errText = await navPushRes.text().catch(() => "");
+    return `Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
   }
 
-  return `Coming soon page pushed to GitHub. Vercel deploying now — live in ~2 minutes at mugendistrict.com/coming-soon`;
+  return `Coming soon pulled from nav. Page still exists but it's off the menu.`;
 }
 
 // ─── Confirmation helpers ─────────────────────────────────────────────────────
@@ -551,6 +651,8 @@ async function executeAction(actionStr: string): Promise<string> {
         return await tool_get_history(parts[1] ?? "10");
       case "tool_push_coming_soon_page":
         return await tool_push_coming_soon_page(parts[1] || undefined);
+      case "tool_remove_coming_soon_page":
+        return await tool_remove_coming_soon_page();
       default:
         return `Unknown tool: ${toolName}`;
     }
@@ -847,8 +949,10 @@ Available actions:
 
 [ACTION:tool_get_history|10]  ← gets last N actions
 
-[ACTION:tool_push_coming_soon_page|]          ← pushes coming-soon page to GitHub
-[ACTION:tool_push_coming_soon_page|sku]       ← marks SKU as COMING_SOON in Supabase, then pushes page
+[ACTION:tool_push_coming_soon_page|]          ← pushes coming-soon page + adds COMING SOON to nav
+[ACTION:tool_push_coming_soon_page|sku]       ← marks SKU as COMING_SOON in Supabase, then pushes page + nav
+
+[ACTION:tool_remove_coming_soon_page|]        ← removes COMING SOON from nav (page file stays)
 
 [ACTION:tool_set_launch_date|2026-05-15T00:00:00Z]  ← reports env-var-only approach
 
