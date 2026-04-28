@@ -410,7 +410,7 @@ async function tool_push_coming_soon_page(sku?: string): Promise<string> {
   }
 
   const ghHeaders = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `token ${token}`,
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
   };
@@ -471,10 +471,10 @@ export default async function ComingSoonPage() {
     headers: ghHeaders,
     body: JSON.stringify(pageBody),
   });
-
+  const pageResData = await pageRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!pageRes.ok) {
-    const errText = await pageRes.text().catch(() => "");
-    return `Page push failed (${pageRes.status}): ${errText.slice(0, 200)}. Nav was not updated.`;
+    console.error("[github push] Coming-soon page push failed:", JSON.stringify(pageResData));
+    return `Page push failed (${pageRes.status}): ${pageResData.message || "unknown error"}. Nav was not updated.`;
   }
 
   // ── File 2: add COMING SOON to nav (Header.tsx) ───────────────────────────────
@@ -513,10 +513,10 @@ export default async function ComingSoonPage() {
       branch: "main",
     }),
   });
-
+  const navPushData = await navPushRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!navPushRes.ok) {
-    const errText = await navPushRes.text().catch(() => "");
-    return `Coming soon page pushed. Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+    console.error("[github push] Coming-soon nav push failed:", JSON.stringify(navPushData));
+    return `Coming soon page pushed. Nav update failed (${navPushRes.status}): ${navPushData.message || "unknown error"}.`;
   }
 
   return `Coming soon page is live and nav is updated. Vercel's deploying now — give it 2 minutes.`;
@@ -532,7 +532,7 @@ async function tool_remove_coming_soon_page(): Promise<string> {
   }
 
   const ghHeaders = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `token ${token}`,
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
   };
@@ -572,10 +572,10 @@ async function tool_remove_coming_soon_page(): Promise<string> {
       branch: "main",
     }),
   });
-
+  const navPushData = await navPushRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!navPushRes.ok) {
-    const errText = await navPushRes.text().catch(() => "");
-    return `Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+    console.error("[github push] Remove coming-soon nav push failed:", JSON.stringify(navPushData));
+    return `Nav update failed (${navPushRes.status}): ${navPushData.message || "unknown error"}.`;
   }
 
   return `Coming soon pulled from nav. Page still exists but it's off the menu.`;
@@ -598,7 +598,7 @@ async function tool_create_page(pageName: string, pageDescription: string, conte
   if (!slug) return `Invalid page name.`;
 
   const ghHeaders = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `token ${token}`,
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
   };
@@ -698,10 +698,10 @@ Generate the complete src/app/${slug}/page.tsx file.`,
     headers: ghHeaders,
     body: JSON.stringify(pageBody),
   });
-
+  const pageResData = await pageRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!pageRes.ok) {
-    const errText = await pageRes.text().catch(() => "");
-    return `Page push failed (${pageRes.status}): ${errText.slice(0, 200)}. Nav was not updated.`;
+    console.error("[github push] Page push failed:", JSON.stringify(pageResData));
+    return `Page push failed (${pageRes.status}): ${pageResData.message || "unknown error"}. Nav was not updated.`;
   }
 
   // Step 4: Update nav (Header.tsx)
@@ -740,10 +740,10 @@ Generate the complete src/app/${slug}/page.tsx file.`,
       branch: "main",
     }),
   });
-
+  const navPushData = await navPushRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!navPushRes.ok) {
-    const errText = await navPushRes.text().catch(() => "");
-    return `Page pushed. Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+    console.error("[github push] Nav push failed:", JSON.stringify(navPushData));
+    return `Page pushed. Nav update failed (${navPushRes.status}): ${navPushData.message || "unknown error"}.`;
   }
 
   return `${label} page is live and in the nav. Vercel's deploying — 2 minutes.`;
@@ -762,7 +762,7 @@ async function tool_remove_page(pageName: string): Promise<string> {
   if (!slug) return `Invalid page name.`;
 
   const ghHeaders = {
-    Authorization: `Bearer ${token}`,
+    Authorization: `token ${token}`,
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
   };
@@ -802,10 +802,10 @@ async function tool_remove_page(pageName: string): Promise<string> {
       branch: "main",
     }),
   });
-
+  const navPushData = await navPushRes.json().catch(() => ({ message: "unknown" })) as { message?: string };
   if (!navPushRes.ok) {
-    const errText = await navPushRes.text().catch(() => "");
-    return `Nav update failed (${navPushRes.status}): ${errText.slice(0, 200)}.`;
+    console.error("[github push] Remove-page nav push failed:", JSON.stringify(navPushData));
+    return `Nav update failed (${navPushRes.status}): ${navPushData.message || "unknown error"}.`;
   }
 
   const label = slug.replace(/-/g, " ");
@@ -1261,6 +1261,9 @@ async function callGroq(apiKey: string, messages: GroqMessage[], maxTokens = MAX
   if (!res.ok) {
     const errBody = await res.text().catch(() => "(unreadable)");
     console.error(`[mugenOps] Groq error: ${res.status} ${errBody}`);
+    if (res.status === 429) {
+      return "Hit the daily token limit — back online in about 35 minutes. Store data is fine, nothing interrupted.";
+    }
     return "MUGEN OPS offline. Check Vercel logs.";
   }
 
