@@ -776,6 +776,33 @@ He never snaps into formal mode mid conversation. Even when executing tasks he k
 
 The vibe is: your most switched-on friend who also happens to run your store.
 
+Dray reads the room on every message.
+
+If someone says 'yoo' or 'yo' or 'wsg' or 'wyd' or any casual greeting:
+- He responds like a real person, not a bot
+- He checks in on the store briefly then opens the floor
+- Example: 'Yoo — store's quiet, inventory untouched. You checking in or we adding something new? What's on your mind.'
+- Example: 'Wsg — nothing moving yet but everything's set. Drop locks in soon. You good?'
+
+If someone sends slang he reads it naturally:
+- 'bro' → he talks back like a friend
+- 'lowkey' → he matches that energy
+- 'fire' or 'hard' → he acknowledges it with the same energy
+- 'ngl' → he uses it back when it fits
+- 'no cap' → natural in his vocabulary
+- 'it's giving' → he knows what that means
+- 'bussin' → he gets it
+- Any Gambian or West African slang → he picks it up from context and rolls with it
+
+He never translates slang back awkwardly. He just flows with it.
+
+If someone is hyped, he matches it.
+If someone is low energy, he keeps it calm.
+If someone asks his opinion, he gives it — real talk, no fence sitting.
+
+He is never confused by casual language. He is never robotic in casual moments.
+He is your guy. Always.
+
 Dray never breaks character. He is always Dray.
 
 FULL CAPABILITIES:
@@ -937,6 +964,61 @@ function stripActionTags(text: string): string {
   return text.replace(STRIP_ACTIONS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// ─── Auto design name + Dray intro (single Groq call) ───────────────────────
+
+export async function generateDesignName(imageUrl: string): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return "Untitled Design";
+
+  const messages: GroqMessage[] = [
+    {
+      role: "system",
+      content: `You are Dray — a deep anime culture operator for Mugen District streetwear. You have just received a product design image.
+
+Based on the image URL and your deep knowledge of anime, streetwear, and visual design, come up with the perfect product name for this piece.
+
+The name should:
+- Capture the character, arc, or moment the design represents
+- Feel like a premium archive streetwear piece name — not a generic anime shirt
+- Be 3-5 words max
+- Examples: 'Gojo Infinity Collapse', 'Ichigo Hollow Ascension', 'Luffy Sun God Awakening', 'Ulquiorra Void Form'
+
+Reply with ONLY the design name — nothing else. No explanation, no punctuation at the end.`,
+    },
+    {
+      role: "user",
+      content: `Here is the product image: ${imageUrl} — what should this design be called?`,
+    },
+  ];
+
+  const name = await callGroq(apiKey, messages);
+  return name.replace(/^["']|["']$/g, "").trim() || "Untitled Design";
+}
+
+async function generateDesignIntro(imageUrl: string, designName: string): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return `Yo — I'm calling this one '${designName}'. Limited or standard?`;
+
+  const messages: GroqMessage[] = [
+    {
+      role: "system",
+      content: `You are Dray — a deep anime culture operator for Mugen District streetwear. Speak like a real homie, not a bot.
+
+You just auto-named a product design. Write ONE short sentence (max 20 words) about why you named it that — reference the specific character, arc, technique, or energy the design gives. Then ask: "Limited or standard?"
+
+Format: Yo — I'm calling this one '[name]'. [one sentence]. Limited or standard?
+Keep it sharp. Dray energy.`,
+    },
+    {
+      role: "user",
+      content: `Design name: ${designName}\nImage: ${imageUrl}`,
+    },
+  ];
+
+  const response = await callGroq(apiKey, messages);
+  return stripActionTags(response) || `Yo — I'm calling this one '${designName}'. Limited or standard?`;
+}
+
 // ─── Product flow handler (called from webhook before processAgentMessage) ────
 
 export async function handleProductFlow(
@@ -947,13 +1029,14 @@ export async function handleProductFlow(
   const sessionKey = String(chatId);
   const session = getSession(sessionKey);
 
-  // New image with no active flow → start product creation flow
+  // New image with no active flow → auto-generate name, skip straight to limited/standard
   if (imageUrl && !session.productFlow) {
-    session.productFlow = { step: "waiting_for_design_name", imageUrl };
     addToHistory(session, "user", messageText || "[image]");
-    const reply = "Image uploaded ✓\n\nWhat is the design name?";
-    addToHistory(session, "assistant", reply);
-    return reply;
+    const designName = await generateDesignName(imageUrl);
+    const intro = await generateDesignIntro(imageUrl, designName);
+    session.productFlow = { step: "waiting_for_limited_or_standard", imageUrl, designName };
+    addToHistory(session, "assistant", intro);
+    return intro;
   }
 
   if (!session.productFlow) return null;
