@@ -14,6 +14,7 @@ const LINKS: NavLink[] = [
   { href: "/new", label: "NEW" },
   { href: "/limited", label: "LIMITED" },
   { href: "/about", label: "ABOUT" },
+  { href: "/discount", label: "DISCOUNT" },
   { href: "/store", label: "ALL PRODUCTS" },
 ];
 
