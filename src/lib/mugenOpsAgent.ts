@@ -376,13 +376,37 @@ async function tool_get_history(limitStr: string): Promise<string> {
   return `Last ${rows.length} actions:\n\n${lines.join("\n\n")}`;
 }
 
-async function tool_push_coming_soon_page(): Promise<string> {
+async function tool_push_coming_soon_page(sku?: string): Promise<string> {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
 
   if (!token || !owner || !repo) {
     return `GitHub env vars not set. Add GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO to Vercel environment variables.`;
+  }
+
+  // If SKU provided, mark product as COMING_SOON in Supabase first
+  if (sku && sku.trim()) {
+    const { data: existing, error: fetchErr } = await supabaseAdmin
+      .from("products")
+      .select("slug, title, status")
+      .eq("slug", sku.trim())
+      .single();
+
+    if (fetchErr || !existing) {
+      return `Error: SKU '${sku}' not found in Supabase. Cannot mark as COMING_SOON.`;
+    }
+
+    const p = existing as { slug: string; title: string; status: string };
+    const { error: updateErr } = await supabaseAdmin
+      .from("products")
+      .update({ status: "COMING_SOON", is_active: true })
+      .eq("slug", sku.trim());
+
+    if (updateErr) return `Error marking ${sku} as COMING_SOON: ${updateErr.message}`;
+
+    await logAction("set_field", sku.trim(), "status", { status: p.status }, { status: "COMING_SOON" });
+    console.log(`[mugenOps] Marked ${sku} as COMING_SOON, pushing page to GitHub`);
   }
 
   const path = "src/app/coming-soon/page.tsx";
@@ -526,7 +550,7 @@ async function executeAction(actionStr: string): Promise<string> {
       case "tool_get_history":
         return await tool_get_history(parts[1] ?? "10");
       case "tool_push_coming_soon_page":
-        return await tool_push_coming_soon_page();
+        return await tool_push_coming_soon_page(parts[1] || undefined);
       default:
         return `Unknown tool: ${toolName}`;
     }
@@ -738,7 +762,8 @@ Available actions:
 
 [ACTION:tool_get_history|10]  ← gets last N actions
 
-[ACTION:tool_push_coming_soon_page|]  ← pushes coming-soon page to GitHub
+[ACTION:tool_push_coming_soon_page|]          ← pushes coming-soon page to GitHub
+[ACTION:tool_push_coming_soon_page|sku]       ← marks SKU as COMING_SOON in Supabase, then pushes page
 
 [ACTION:tool_set_launch_date|2026-05-15T00:00:00Z]  ← reports env-var-only approach
 
@@ -786,6 +811,11 @@ async function callGroq(apiKey: string, messages: GroqMessage[]): Promise<string
 }
 
 const ACTION_RE = /\[ACTION:([^\]]+)\]/;
+const STRIP_ACTIONS_RE = /\[ACTION:[^\]]*\]/g;
+
+function stripActionTags(text: string): string {
+  return text.replace(STRIP_ACTIONS_RE, "").replace(/\n{3,}/g, "\n\n").trim();
+}
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
@@ -916,8 +946,9 @@ Values: price_gmd=${isLimited ? "2000" : "1500"}, status=${isLimited ? "LIMITED"
     const actionMatch = ACTION_RE.exec(firstResponse);
 
     if (!actionMatch) {
-      addToHistory(session, "assistant", firstResponse);
-      return firstResponse;
+      const clean = stripActionTags(firstResponse);
+      addToHistory(session, "assistant", clean);
+      return clean;
     }
 
     const parts = actionMatch[1].split("|");
@@ -943,8 +974,10 @@ Values: price_gmd=${isLimited ? "2000" : "1500"}, status=${isLimited ? "LIMITED"
       content: `[TOOL RESULT]: ${toolResult}\n\nGive a short confirmation to the owner based on this result. No action tags in your response.`,
     });
 
-    const finalResponse = await callGroq(apiKey, messages);
-    const fullResponse = visibleText ? `${visibleText}\n\n${finalResponse}` : finalResponse;
+    const finalResponse = stripActionTags(await callGroq(apiKey, messages));
+    const fullResponse = stripActionTags(
+      visibleText ? `${visibleText}\n\n${finalResponse}` : finalResponse
+    );
     addToHistory(session, "assistant", fullResponse);
     return fullResponse;
   } catch (err) {
