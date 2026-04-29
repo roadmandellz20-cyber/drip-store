@@ -1284,32 +1284,34 @@ function stripActionTags(text: string): string {
 // ─── Auto design name + Dray intro (single Groq call) ───────────────────────
 
 export async function generateDesignName(imageUrl: string): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return "Untitled Design";
 
-  const messages: GroqMessage[] = [
-    {
-      role: "system",
-      content: `You are Dray — a deep anime culture operator for Mugen District streetwear. You have just received a product design image.
+  try {
+    const imageRes = await fetch(imageUrl);
+    const arrayBuffer = await imageRes.arrayBuffer();
+    const base64Image = Buffer.from(arrayBuffer).toString("base64");
 
-Based on the image URL and your deep knowledge of anime, streetwear, and visual design, come up with the perfect product name for this piece.
-
-The name should:
-- Capture the character, arc, or moment the design represents
-- Feel like a premium archive streetwear piece name — not a generic anime shirt
-- Be 3-5 words max
-- Examples: 'Gojo Infinity Collapse', 'Ichigo Hollow Ascension', 'Luffy Sun God Awakening', 'Ulquiorra Void Form'
-
-Reply with ONLY the design name — nothing else. No explanation, no punctuation at the end.`,
-    },
-    {
-      role: "user",
-      content: `Here is the product image: ${imageUrl} — what should this design be called?`,
-    },
-  ];
-
-  const name = await callGroq(apiKey, messages);
-  return name.replace(/^["']|["']$/g, "").trim() || "Untitled Design";
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: "image/jpeg", data: base64Image } },
+              { text: "You are a deep anime culture expert. Look at this streetwear design and identify exactly which anime character and arc this represents. Give it a premium streetwear product name — 3 to 5 words, archive drop energy. Examples: Gojo Infinity Collapse, Ichigo Hollow Ascension. Reply with ONLY the product name." },
+            ],
+          }],
+        }),
+      }
+    );
+    const data = await response.json();
+    return data.candidates[0].content.parts[0].text.trim();
+  } catch {
+    return "Untitled Design";
+  }
 }
 
 async function generateDesignIntro(imageUrl: string, designName: string): Promise<string> {
