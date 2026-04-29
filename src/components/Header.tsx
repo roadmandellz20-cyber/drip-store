@@ -15,6 +15,7 @@ const LINKS: NavLink[] = [
   { href: "/limited", label: "LIMITED" },
   { href: "/about", label: "ABOUT" },
   { href: "/discount", label: "DISCOUNT" },
+  { href: "/5-year-anniversary", label: "5 YEAR ANNIVERSARY" },
   { href: "/store", label: "ALL PRODUCTS" },
 ];
 
