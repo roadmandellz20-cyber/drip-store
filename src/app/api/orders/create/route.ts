@@ -730,19 +730,31 @@ export async function POST(request: Request) {
   try {
     console.log("[orders/create] env_presence", buildLaunchEnvPresence());
 
-    if (!isLaunchLive()) {
+    // ── Test mode: gated behind TEST_MODE_SECRET (>= 16 chars, header must match exactly) ──
+    const testModeSecret = process.env.TEST_MODE_SECRET ?? "";
+    const isTestMode =
+      testModeSecret.length >= 16 &&
+      request.headers.get("x-test-mode-secret") === testModeSecret;
+
+    if (isTestMode) {
+      console.log("[orders/create] test mode active — bypassing launch lock and rate limit");
+    }
+
+    if (!isTestMode && !isLaunchLive()) {
       return NextResponse.json(
         { error: LOCKED_BUTTON_TEXT },
         { status: 403 }
       );
     }
 
-    const rateLimit = await consumeRequestRateLimit(ORDER_CREATE_RATE_LIMIT, request);
-    if (!rateLimit.allowed) {
-      return rateLimitJsonResponse(
-        "Too many checkout attempts. Try again in a little bit.",
-        rateLimit.retryAfterSeconds
-      );
+    if (!isTestMode) {
+      const rateLimit = await consumeRequestRateLimit(ORDER_CREATE_RATE_LIMIT, request);
+      if (!rateLimit.allowed) {
+        return rateLimitJsonResponse(
+          "Too many checkout attempts. Try again in a little bit.",
+          rateLimit.retryAfterSeconds
+        );
+      }
     }
 
     const body = (await request.json()) as {

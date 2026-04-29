@@ -12,7 +12,8 @@
     "playwright:install": "npx playwright install --with-deps",
     "playwright:test": "npx playwright test",
     "lhci": "lhci autorun",
-    "register:webhook": "node --env-file=.env.local --experimental-strip-types scripts/registerTelegramWebhook.ts"
+    "register:webhook": "node --env-file=.env.local --experimental-strip-types scripts/registerTelegramWebhook.ts",
+    "test:checkout": "node --env-file=.env.local --experimental-strip-types scripts/testCheckout.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
