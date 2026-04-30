@@ -273,9 +273,9 @@ function renderCustomerBody(payload: OrderEmailPayload) {
         ORDER CONFIRMED.
       </div>
       <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        Your archive pull is locked.<br/>
+        Your order ships end of week. We'll reach out via WhatsApp to confirm before it goes out.<br/>
         ${hasLimitedPiece ? "Limited Archive piece confirmed.<br/>" : ""}
-        We will message you next with payment and delivery details.
+        No restocks once this run sells out. You're locked in.
       </div>
     </div>
   `;
@@ -324,22 +324,22 @@ function renderCustomerBody(payload: OrderEmailPayload) {
 
   const nextSteps = `
     <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Next Steps</div>
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">What Happens Next</div>
       <div style="margin-top:8px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-        1. We review the order and confirm payment options.<br/>
-        2. We message you with delivery timing.<br/>
-        3. For a faster line, hit WhatsApp or keep up with the archive on Instagram.
+        1. Your order ships end of week.<br/>
+        2. We'll WhatsApp you before it goes out to confirm details.<br/>
+        3. Reply to this email or hit the button below if you need anything before then.
       </div>
     </div>
   `;
 
   const linksBlock = `
     <div style="margin-top:18px;">
-      <a href="${WHATSAPP_SUPPORT_URL}" style="display:inline-block;padding:12px 16px;border:1px solid rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;">
-        WhatsApp Support
+      <a href="${WHATSAPP_SUPPORT_URL}" style="display:inline-block;padding:12px 20px;background:#ffffff;color:#050505;text-decoration:none;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;">
+        WhatsApp Us
       </a>
       <a href="${INSTAGRAM_URL}" style="display:inline-block;margin-left:10px;padding:12px 16px;border:1px solid rgba(255,255,255,0.12);color:#ffffff;text-decoration:none;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
-        Instagram
+        Follow Archive
       </a>
     </div>
   `;
@@ -385,11 +385,14 @@ function renderAdminBody(payload: OrderEmailPayload) {
 
   const header = `
     <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
-      <div style="font-weight:900;font-size:14px;letter-spacing:0.10em;text-transform:uppercase;">
+      <div style="font-weight:900;font-size:14px;letter-spacing:0.10em;text-transform:uppercase;color:#ff4444;">
+        ⚠️ PREORDER — Ships end of week
+      </div>
+      <div style="margin-top:12px;font-weight:900;font-size:14px;letter-spacing:0.10em;text-transform:uppercase;">
         New Order • ${esc(payload.orderNumber)}
       </div>
       <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        Manual payment required. Contact customer to finalize payment + delivery.
+        Manual payment required. WhatsApp customer before dispatch to confirm.
       </div>
     </div>
   `;
@@ -453,19 +456,19 @@ function renderAdminFooter() {
       Ops Note
     </div>
     <div style="margin-top:10px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-      Confirm payment method with customer, then schedule delivery. Keep a screenshot of this order.
+      PREORDER — ships end of week. WhatsApp customer before dispatch to confirm details. Keep a screenshot of this order.
     </div>
   `;
 }
 
 export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `Order Confirmed — ${payload.orderNumber} | MUGEN DISTRICT`;
-  const preheader = `Order confirmed: ${payload.orderNumber}. Next steps, support, and archive links inside.`;
+  const subject = `Your Mugen District Pre-Order is Confirmed`;
+  const preheader = `Pre-order confirmed: ${payload.orderNumber}. Your order ships end of week.`;
 
   const html = wrapHtml({
     preheader,
     headlineTop: "ORDER CONFIRMED.",
-    headlineBottom: "TOKYO GRIT LOGGED.",
+    headlineBottom: "PRE-ORDER LOCKED.",
     bodyHtml: renderCustomerBody(payload),
     footerHtml: renderCustomerFooter(),
   });
@@ -473,9 +476,10 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
   const text = [
     "MUGEN DISTRICT",
     "",
-    "ORDER CONFIRMED.",
-    "Tokyo grit. Archive locked.",
-    "We will message you next with payment and delivery details.",
+    "ORDER CONFIRMED. PRE-ORDER LOCKED.",
+    "",
+    "Your order ships end of week. We'll reach out via WhatsApp to confirm before it goes out.",
+    "No restocks once this run sells out. You're locked in.",
     "",
     `Order Ref: ${payload.orderNumber}`,
     "",
@@ -490,18 +494,17 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     payload.customerPhone ? `Phone: ${payload.customerPhone}` : "",
     payload.deliveryNote ? `Note: ${payload.deliveryNote}` : "",
     "",
-    "Next Steps:",
-    "1. Watch for payment instructions.",
-    "2. Watch for delivery timing.",
-    `3. WhatsApp support: ${WHATSAPP_SUPPORT_URL}`,
-    `4. Instagram: ${INSTAGRAM_URL}`,
+    "What Happens Next:",
+    "1. Your order ships end of week.",
+    "2. We'll WhatsApp you before it goes out to confirm details.",
+    `3. WhatsApp: ${WHATSAPP_SUPPORT_URL}`,
     "",
     "THE ARCHIVE",
     "Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics.",
     "We don't just drop clothes; we archive movements. Established 2026.",
     "From the coast of Gambia to the heart of Shibuya.",
     "",
-    "— MUGEN DISTRICT • Unlimited Territory",
+    "— MUGEN DISTRICT",
   ]
     .filter(Boolean)
     .join("\n");
@@ -510,19 +513,21 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
 }
 
 export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `NEW ORDER • ${payload.orderNumber}`;
-  const preheader = `New manual-payment order: ${payload.orderNumber}. Customer + shipping details inside.`;
+  const subject = `⚠️ PREORDER • NEW ORDER • ${payload.orderNumber}`;
+  const preheader = `PREORDER: New order ${payload.orderNumber} — ships end of week. Customer details inside.`;
 
   const html = wrapHtml({
     preheader,
     headlineTop: "NEW ORDER",
-    headlineBottom: "ARCHIVE ENTRY",
+    headlineBottom: "PREORDER — END OF WEEK",
     bodyHtml: renderAdminBody(payload),
     footerHtml: renderAdminFooter(),
   });
 
   const text = [
     "MUGEN DISTRICT — ADMIN",
+    "",
+    "⚠️ PREORDER — Ships end of week",
     "",
     `NEW ORDER: ${payload.orderNumber}`,
     "",
@@ -543,7 +548,7 @@ export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     "",
     `Total: ${formatMoney(payload.totalCents, payload.currency)}`,
     "",
-    "Ops Note: Confirm payment method, then schedule delivery.",
+    "Ops Note: PREORDER — ships end of week. WhatsApp customer before dispatch to confirm.",
   ]
     .filter(Boolean)
     .join("\n");
