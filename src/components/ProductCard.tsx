@@ -178,7 +178,7 @@ export default function ProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {product.comingSoon ? "COMING SOON" : soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
+              {product.comingSoon ? "COMING SOON" : soldOutUi ? "SOLD OUT" : launchLive ? "PRE-ORDER NOW" : LOCKED_BUTTON_TEXT}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>

@@ -234,7 +234,7 @@ function DetailRelatedProductCard({
               type="button"
               disabled={addDisabled}
             >
-              {soldOutUi ? "SOLD OUT" : launchLive ? "COP" : LOCKED_BUTTON_TEXT}
+              {soldOutUi ? "SOLD OUT" : launchLive ? "PRE-ORDER NOW" : LOCKED_BUTTON_TEXT}
             </button>
 
             <div className="p-card__price">GMD {product.price.toLocaleString()}</div>
@@ -366,7 +366,7 @@ export default function ProductDetailClient({
               ) : (
                 <>
                   <button className="btn btn--primary" onClick={onAdd} disabled={addDisabled} type="button">
-                    {soldOutUi ? "SOLD OUT" : "ADD TO CART"}
+                    {soldOutUi ? "SOLD OUT" : "PRE-ORDER NOW"}
                   </button>
                   {!soldOutUi ? (
                     <Link className="btn btn--ghost" href="/checkout">
@@ -377,6 +377,11 @@ export default function ProductDetailClient({
                       SOLD OUT
                     </button>
                   )}
+                  {!soldOutUi ? (
+                    <p className="detail__preorderNote">
+                      ships end of week — we confirm your order by whatsapp.
+                    </p>
+                  ) : null}
                 </>
               )}
             </div>

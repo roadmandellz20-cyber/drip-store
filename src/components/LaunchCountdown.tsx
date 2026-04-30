@@ -73,7 +73,7 @@ export default function LaunchCountdown({
     return (
       <div className="launchInline">
         {isLive ? (
-          <span className="launchInline__live">DROP IS LIVE</span>
+          <span className="launchInline__live">PRE-ORDER NOW OPEN</span>
         ) : (
           <div className="launchTimer launchTimer--inline" aria-label="Launch countdown">
             <CountdownUnits days={days} hours={hours} mins={mins} secs={secs} />
@@ -88,11 +88,11 @@ export default function LaunchCountdown({
       <div className="launchBanner__left">
         <div className="launchBanner__kicker">MUGEN DISTRICT</div>
         <div className="launchBanner__title">
-          {isLive ? "DROP IS LIVE" : "ARCHIVE DROP LOCKED"}
+          {isLive ? "PRE-ORDER NOW OPEN" : "ARCHIVE DROP LOCKED"}
         </div>
         <div className="launchBanner__sub">
           {isLive
-            ? "The archive is open. Enter the Mugen."
+            ? "Ships end of week. Limited archive release. No restocks."
             : LOCKED_ORDERING_UNLOCKS_TEXT}
         </div>
       </div>

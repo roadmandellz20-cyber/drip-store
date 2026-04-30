@@ -176,8 +176,8 @@ export default function ArchiveClient() {
 
                 <div className="md-actions">
                   <button className="md-copBtn" type="button">
-                    <span className="md-copText">COP</span>
-                    <span className="md-copText md-copTextGhost">COP</span>
+                    <span className="md-copText">PRE-ORDER</span>
+                    <span className="md-copText md-copTextGhost">PRE-ORDER</span>
                   </button>
 
                   <a className="md-link" href="/store">

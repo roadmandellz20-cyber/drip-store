@@ -1526,6 +1526,13 @@ main{padding-top:calc(var(--promo-height) + var(--header-height));}
 .detail__stockSubline{
   color:rgba(255,228,220,.76);
 }
+.detail__preorderNote{
+  font-size:11px;
+  letter-spacing:.06em;
+  color:rgba(255,255,255,.46);
+  margin:6px 0 0;
+  font-family:var(--mono);
+}
 .detail__desc p{margin:0 0 10px; color:rgba(255,255,255,.82)}
 .detail__label{letter-spacing:.22em; text-transform:uppercase; font-size:12px; opacity:.8; margin-top:14px}
 .sizes{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}

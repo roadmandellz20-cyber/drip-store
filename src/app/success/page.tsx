@@ -28,9 +28,9 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
         <div className="page">
           <div className="page__head">
             <div className="page__kicker">MUGEN DISTRICT</div>
-            <h1 className="page__title">ORDER ARCHIVED</h1>
+            <h1 className="page__title">ORDER CONFIRMED.</h1>
             <p className="page__sub">
-              Logging your entry into the archive…
+              Your pre-order is locked in. Confirming via WhatsApp shortly…
             </p>
           </div>
 
