@@ -1,6 +1,6 @@
 // src/lib/email/templates.ts
-// MUGEN DISTRICT — Luxury transactional templates (dark, sharp, premium).
-// Works with current manual order flow: customer + admin emails.
+// MUGEN DISTRICT — Premium dark transactional email templates.
+// Pure black, monospaced data, sharp borders. Renders in Gmail, Apple Mail, Outlook.
 
 export type EmailOrderItem = {
   title: string;
@@ -12,7 +12,6 @@ export type EmailOrderItem = {
   size?: string;
   limited?: boolean;
   remainingQty?: number | null;
-  // Optional: if you ever pass it in later, we'll use it (safe fallback).
   imageUrl?: string;
 };
 
@@ -20,14 +19,11 @@ export type OrderEmailPayload = {
   orderNumber: string;
   currency: string;
   totalCents: number;
-
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
-
   shippingAddress?: string;
   deliveryNote?: string;
-
   items: EmailOrderItem[];
 };
 
@@ -40,6 +36,8 @@ type EmailTemplate = {
 const WHATSAPP_SUPPORT_URL = "https://wa.me/2203340558";
 const INSTAGRAM_URL = "https://instagram.com/mugendistrict";
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
+
 function esc(input: unknown) {
   const s = typeof input === "string" ? input : String(input ?? "");
   return s
@@ -50,10 +48,13 @@ function esc(input: unknown) {
     .replaceAll("'", "&#039;");
 }
 
-function formatMoney(cents: number, currency: string) {
+function formatMajor(cents: number) {
   const safe = Number.isFinite(cents) ? Math.round(cents) : 0;
-  const major = (safe / 100).toFixed(2);
-  return `${currency.toUpperCase()} ${major}`;
+  return (safe / 100).toFixed(2);
+}
+
+function formatMoney(cents: number, currency: string) {
+  return `${currency.toUpperCase()} ${formatMajor(cents)}`;
 }
 
 function nonEmptyLines(value?: string) {
@@ -63,8 +64,11 @@ function nonEmptyLines(value?: string) {
 }
 
 function joinAddressOneLine(address?: string) {
-  const lines = nonEmptyLines(address);
-  return lines.join(", ");
+  return nonEmptyLines(address).join(", ");
+}
+
+function safeName(name?: string) {
+  return (name || "").trim() || "Customer";
 }
 
 function orderItemsText(items: EmailOrderItem[]) {
@@ -73,415 +77,311 @@ function orderItemsText(items: EmailOrderItem[]) {
       const size = (it.size || "M").toUpperCase();
       const sku = (it.sku || "").trim();
       const limitedNote = it.limited
-        ? `\n  Limited Archive piece confirmed${typeof it.remainingQty === "number" ? ` — ${it.remainingQty} left` : ""}`
+        ? `\n  Limited archive piece confirmed${typeof it.remainingQty === "number" ? ` — ${it.remainingQty} left` : ""}`
         : "";
-      const skuText = sku ? ` [${sku}]` : "";
-      return `- ${it.title}${skuText} (Size ${size}) x${it.qty} — ${formatMoney(
-        it.lineTotalCents,
-        it.currency
-      )}${limitedNote}`;
+      return `- ${it.title}${sku ? ` [${sku}]` : ""} (Size ${size}) x${it.qty} — ${formatMoney(it.lineTotalCents, it.currency)}${limitedNote}`;
     })
     .join("\n");
 }
 
-function safeName(name?: string) {
-  const n = (name || "").trim();
-  return n || "Customer";
+// ─── Admin HTML ───────────────────────────────────────────────────────────────
+
+function buildAdminItemRows(items: EmailOrderItem[]) {
+  return items
+    .map(
+      (it) =>
+        `<tr>
+          <td style="padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">
+            <p style="margin:0;color:#ffffff;font-size:14px;font-weight:600;">${esc(it.title)}</p>
+            <p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:12px;font-family:'Courier New',Courier,monospace;">SKU: ${esc(it.sku?.trim() || "—")} &bull; Size: ${esc((it.size || "M").toUpperCase())} &bull; Qty: ${esc(it.qty)}</p>
+          </td>
+          <td align="right" style="padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">
+            <p style="margin:0;color:#ffffff;font-size:14px;font-weight:600;">GMD ${esc(formatMajor(it.lineTotalCents))}</p>
+            <p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:12px;">Unit: GMD ${esc(formatMajor(it.unitPriceCents))}</p>
+          </td>
+        </tr>`
+    )
+    .join("");
 }
 
-/**
- * Premium dark email wrapper (inline CSS only for max compatibility).
- * No external fonts, no background images (deliverability-safe).
- */
-function wrapHtml(params: {
-  preheader: string;
-  headlineTop: string;
-  headlineBottom: string;
-  bodyHtml: string;
-  footerHtml: string;
-}) {
-  const { preheader, headlineTop, headlineBottom, bodyHtml, footerHtml } = params;
+function buildAdminEmailHtml(payload: OrderEmailPayload): string {
+  const orderDate = new Date().toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
-  // Accent: Use only one accent color (red) for premium edge.
-  const ACCENT = "#ff0000";
-  const BG = "#050505";
-  const FG = "#ffffff";
-  const MUTED = "rgba(255,255,255,0.72)";
-  const SOFT = "rgba(255,255,255,0.12)";
-  const SOFT2 = "rgba(255,255,255,0.08)";
+  const addressHtml = nonEmptyLines(payload.shippingAddress).length
+    ? nonEmptyLines(payload.shippingAddress).map((l) => esc(l)).join("<br/>")
+    : "—";
 
-  return `<!doctype html>
+  const deliveryNote = (payload.deliveryNote || "").trim();
+  const deliveryNoteBlock = deliveryNote
+    ? `<p style="margin:12px 0 0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">DELIVERY NOTE</p>
+       <p style="margin:4px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">${esc(deliveryNote)}</p>`
+    : "";
+
+  return `<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="x-apple-disable-message-reformatting" />
-    <title>MUGEN DISTRICT</title>
-  </head>
-  <body style="margin:0;padding:0;background:${BG};color:${FG};font-family:Arial, Helvetica, sans-serif;">
-    <!-- Preheader (hidden) -->
-    <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
-      ${esc(preheader)}
-    </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>New Order</title>
+</head>
+<body style="margin:0;padding:0;background:#000000;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <!-- Preheader -->
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">PREORDER: ${esc(payload.orderNumber)} &mdash; ${esc(safeName(payload.customerName))} &mdash; Ships end of week.</div>
 
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${BG};">
-      <tr>
-        <td align="center" style="padding:28px 16px 48px;">
-          <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="border-collapse:collapse;max-width:640px;width:100%;">
-            <!-- Brand Header -->
-            <tr>
-              <td style="padding:0 0 16px;">
-                <div style="letter-spacing:0.12em;font-weight:700;font-size:12px;color:${MUTED};text-transform:uppercase;">
-                  MUGEN DISTRICT
-                </div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#000000;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-                <div style="margin-top:10px;">
-                  <div style="font-weight:900;font-size:28px;line-height:1.08;letter-spacing:-0.02em;">
-                    ${esc(headlineTop)}
-                  </div>
-                  <div style="font-weight:900;font-size:28px;line-height:1.08;letter-spacing:-0.02em;">
-                    ${esc(headlineBottom)}
-                  </div>
-                </div>
+          <!-- Header -->
+          <tr>
+            <td style="padding-bottom:32px;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">MUGEN DISTRICT</p>
+              <h1 style="margin:8px 0 0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;">NEW ORDER<br>ARCHIVE ENTRY</h1>
+            </td>
+          </tr>
 
-                <!-- Sharp divider -->
-                <div style="margin-top:18px;height:2px;background:${SOFT};"></div>
-              </td>
-            </tr>
+          <!-- Preorder flag -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border:1px solid rgba(192,57,43,0.6);padding:16px;">
+                    <p style="margin:0;color:#c0392b;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:700;">&#9888; PREORDER &mdash; SHIPS END OF WEEK</p>
+                    <p style="margin:8px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">Contact customer to confirm shipping before dispatch.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-            <!-- Body -->
-            <tr>
-              <td style="padding:0;">
-                ${bodyHtml}
-              </td>
-            </tr>
+          <!-- Order ref -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">ORDER REFERENCE</p>
+              <p style="margin:8px 0 0;color:#ffffff;font-size:20px;font-family:'Courier New',Courier,monospace;font-weight:700;letter-spacing:0.05em;">${esc(payload.orderNumber)}</p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,0.4);font-size:12px;font-family:'Courier New',Courier,monospace;">${esc(orderDate)}</p>
+            </td>
+          </tr>
 
-            <!-- Footer / Manifesto -->
-            <tr>
-              <td style="padding:28px 0 0;">
-                <div style="height:2px;background:${SOFT2};"></div>
-                <div style="padding-top:18px;">
-                  ${footerHtml}
-                </div>
-              </td>
-            </tr>
+          <!-- Customer -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0 0 12px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">CUSTOMER</p>
+              <p style="margin:0;color:#ffffff;font-size:15px;font-weight:600;">${esc(safeName(payload.customerName))}</p>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">${esc(payload.customerEmail || "—")}</p>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">${esc(payload.customerPhone || "—")}</p>
+            </td>
+          </tr>
 
-            <!-- Micro footer -->
-            <tr>
-              <td style="padding:18px 0 0;">
-                <div style="font-size:12px;line-height:1.5;color:${MUTED};">
-                  If you didn't place this order, reply to this email immediately.
-                </div>
-                <div style="margin-top:10px;font-size:12px;line-height:1.5;color:${MUTED};">
-                  <span style="color:${ACCENT};">—</span> MUGEN DISTRICT • Unlimited Territory
-                </div>
-              </td>
-            </tr>
+          <!-- Shipping -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0 0 12px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">SHIPPING ADDRESS</p>
+              <p style="margin:0;color:#ffffff;font-size:14px;line-height:1.6;">${addressHtml}</p>
+              ${deliveryNoteBlock}
+            </td>
+          </tr>
 
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+          <!-- Items -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-bottom:12px;">
+                    <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">ARCHIVE ITEMS</p>
+                  </td>
+                  <td align="right" style="padding-bottom:12px;">
+                    <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">TOTAL</p>
+                  </td>
+                </tr>
+                ${buildAdminItemRows(payload.items)}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Grand total -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td><p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">GRAND TOTAL</p></td>
+                  <td align="right"><p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;font-family:'Courier New',Courier,monospace;">GMD ${esc(formatMajor(payload.totalCents))}</p></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top:32px;">
+              <p style="margin:0;color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">MUGEN DISTRICT &mdash; ARCHIVE DROP SYSTEM</p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,0.2);font-size:11px;">Manual payment required. Contact customer via WhatsApp to finalize.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>`;
 }
 
-function renderOrderTable(params: {
-  items: EmailOrderItem[];
-  currency: string;
-  totalCents: number;
-}) {
-  const { items, currency, totalCents } = params;
+// ─── Customer HTML ────────────────────────────────────────────────────────────
 
-  const rows = items
-    .map((it) => {
-      const size = (it.size || "M").toUpperCase();
-      const sku = (it.sku || "").trim();
-      return `
-        <tr>
-          <td style="padding:14px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;">
-            <div style="font-weight:800;font-size:14px;line-height:1.25;">${esc(it.title)}</div>
-            <div style="margin-top:6px;font-size:12px;line-height:1.4;color:rgba(255,255,255,0.72);">
-              ${sku ? `SKU: ${esc(sku)} • ` : ""}Size: ${esc(size)} • Qty: ${esc(it.qty)}
-            </div>
-            ${
-              it.limited
-                ? `<div style="margin-top:6px;font-size:12px;line-height:1.4;color:#ffffff;">
-              Limited Archive piece confirmed${typeof it.remainingQty === "number" ? ` • ${esc(it.remainingQty)} left` : ""}
-            </div>`
-                : ""
-            }
+function buildCustomerItemRows(items: EmailOrderItem[]) {
+  return items
+    .map(
+      (it) =>
+        `<tr>
+          <td style="padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">
+            <p style="margin:0;color:#ffffff;font-size:14px;font-weight:600;">${esc(it.title)}</p>
+            <p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:12px;font-family:'Courier New',Courier,monospace;">Size: ${esc((it.size || "M").toUpperCase())} &bull; Qty: ${esc(it.qty)}</p>
+            ${it.limited ? `<p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:12px;">Limited archive piece${typeof it.remainingQty === "number" ? ` &mdash; ${esc(it.remainingQty)} remaining` : ""}</p>` : ""}
           </td>
-          <td align="right" style="padding:14px 12px;border-bottom:1px solid rgba(255,255,255,0.10);vertical-align:top;">
-            <div style="font-weight:900;font-size:14px;">${esc(
-              formatMoney(it.lineTotalCents, it.currency || currency)
-            )}</div>
-            <div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.72);">
-              Unit: ${esc(formatMoney(it.unitPriceCents, it.currency || currency))}
-            </div>
+          <td align="right" style="padding:12px 0;border-top:1px solid rgba(255,255,255,0.08);">
+            <p style="margin:0;color:#ffffff;font-size:14px;font-weight:600;">GMD ${esc(formatMajor(it.lineTotalCents))}</p>
+            <p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:12px;">Unit: GMD ${esc(formatMajor(it.unitPriceCents))}</p>
           </td>
-        </tr>
-      `;
-    })
+        </tr>`
+    )
     .join("");
-
-  const total = formatMoney(totalCents, currency);
-
-  return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:14px;border:1px solid rgba(255,255,255,0.12);">
-      <thead>
-        <tr>
-          <th align="left" style="padding:12px 12px;border-bottom:1px solid rgba(255,255,255,0.12);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-            Archive Items
-          </th>
-          <th align="right" style="padding:12px 12px;border-bottom:1px solid rgba(255,255,255,0.12);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-            Total
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-        <tr>
-          <td style="padding:14px 12px;">
-            <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-              Grand Total
-            </div>
-          </td>
-          <td align="right" style="padding:14px 12px;">
-            <div style="font-weight:950;font-size:18px;letter-spacing:-0.01em;">${esc(
-              total
-            )}</div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  `;
 }
 
-function renderCustomerBody(payload: OrderEmailPayload) {
-  const hasLimitedPiece = payload.items.some((item) => item.limited);
-  const orderLine = `<div style="margin-top:18px;">
-    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Order</div>
-    <div style="margin-top:6px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;font-size:15px;line-height:1.35;">
-      ${esc(payload.orderNumber)}
-    </div>
-  </div>`;
-
-  const statusPanel = `
-    <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
-      <div style="font-weight:800;font-size:14px;letter-spacing:0.02em;">
-        ORDER CONFIRMED.
-      </div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        Your order ships end of week. We'll reach out via WhatsApp to confirm before it goes out.<br/>
-        ${hasLimitedPiece ? "Limited Archive piece confirmed.<br/>" : ""}
-        No restocks once this run sells out. You're locked in.
-      </div>
-    </div>
-  `;
-
+function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
   const addressOneLine = joinAddressOneLine(payload.shippingAddress);
-  const shippingBlock = `
-    <div style="margin-top:18px;">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Shipping</div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;">
-        <div style="font-weight:800;">${esc(safeName(payload.customerName))}</div>
-        <div style="color:rgba(255,255,255,0.82);">${esc(addressOneLine || "—")}</div>
-        ${
-          payload.customerPhone
-            ? `<div style="color:rgba(255,255,255,0.72);margin-top:6px;">Phone: ${esc(
-                payload.customerPhone
-              )}</div>`
-            : ""
-        }
-      </div>
-    </div>
-  `;
-
-  const note = (payload.deliveryNote || "").trim();
-  const noteBlock = note
-    ? `
-    <div style="margin-top:14px;padding:12px;border:1px solid rgba(255,255,255,0.10);">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Delivery Note</div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">${esc(
-        note
-      )}</div>
-    </div>
-  `
+  const deliveryNote = (payload.deliveryNote || "").trim();
+  const deliveryNoteBlock = deliveryNote
+    ? `<p style="margin:12px 0 0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">DELIVERY NOTE</p>
+       <p style="margin:4px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">${esc(deliveryNote)}</p>`
     : "";
 
-  const table = renderOrderTable({
-    items: payload.items,
-    currency: payload.currency,
-    totalCents: payload.totalCents,
-  });
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Pre-Order Confirmed</title>
+</head>
+<body style="margin:0;padding:0;background:#000000;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <!-- Preheader -->
+  <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">Pre-order confirmed: ${esc(payload.orderNumber)}. Ships end of week &mdash; we'll confirm via WhatsApp before it goes out.</div>
 
-  const trustLine = `
-    <div style="margin-top:18px;font-size:12px;line-height:1.6;color:rgba(255,255,255,0.72);">
-      This is a manual-payment order. Keep this email for your records and use the fast lane below if you want immediate support.
-    </div>
-  `;
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#000000;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
-  const nextSteps = `
-    <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">What Happens Next</div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-        1. Your order ships end of week.<br/>
-        2. We'll WhatsApp you before it goes out to confirm details.<br/>
-        3. Reply to this email or hit the button below if you need anything before then.
-      </div>
-    </div>
-  `;
+          <!-- Header -->
+          <tr>
+            <td style="padding-bottom:32px;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">MUGEN DISTRICT</p>
+              <h1 style="margin:8px 0 0;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:-0.02em;line-height:1.1;">YOUR PRE-ORDER<br>IS CONFIRMED.</h1>
+            </td>
+          </tr>
 
-  const linksBlock = `
-    <div style="margin-top:18px;">
-      <a href="${WHATSAPP_SUPPORT_URL}" style="display:inline-block;padding:12px 20px;background:#ffffff;color:#050505;text-decoration:none;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;">
-        WhatsApp Us
-      </a>
-      <a href="${INSTAGRAM_URL}" style="display:inline-block;margin-left:10px;padding:12px 16px;border:1px solid rgba(255,255,255,0.12);color:#ffffff;text-decoration:none;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">
-        Follow Archive
-      </a>
-    </div>
-  `;
+          <!-- Order ref -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">ORDER REFERENCE</p>
+              <p style="margin:8px 0 0;color:#ffffff;font-size:20px;font-family:'Courier New',Courier,monospace;font-weight:700;letter-spacing:0.05em;">${esc(payload.orderNumber)}</p>
+            </td>
+          </tr>
 
-  return `
-    ${statusPanel}
-    ${orderLine}
-    ${table}
-    ${shippingBlock}
-    ${noteBlock}
-    ${nextSteps}
-    ${linksBlock}
-    ${trustLine}
-  `;
+          <!-- Shipping -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <p style="margin:0 0 12px;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">SHIPPING TO</p>
+              <p style="margin:0;color:#ffffff;font-size:15px;font-weight:600;">${esc(safeName(payload.customerName))}</p>
+              <p style="margin:4px 0 0;color:rgba(255,255,255,0.6);font-size:13px;">${esc(addressOneLine || "—")}</p>
+              ${payload.customerPhone ? `<p style="margin:4px 0 0;color:rgba(255,255,255,0.4);font-size:13px;">${esc(payload.customerPhone)}</p>` : ""}
+              ${deliveryNoteBlock}
+            </td>
+          </tr>
+
+          <!-- Items -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-bottom:12px;">
+                    <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">ARCHIVE ITEMS</p>
+                  </td>
+                  <td align="right" style="padding-bottom:12px;">
+                    <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">TOTAL</p>
+                  </td>
+                </tr>
+                ${buildCustomerItemRows(payload.items)}
+              </table>
+            </td>
+          </tr>
+
+          <!-- Grand total -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td><p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">GRAND TOTAL</p></td>
+                  <td align="right"><p style="margin:0;color:#ffffff;font-size:20px;font-weight:700;font-family:'Courier New',Courier,monospace;">GMD ${esc(formatMajor(payload.totalCents))}</p></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Shipping status + CTA -->
+          <tr>
+            <td style="padding:24px 0;border-bottom:1px solid rgba(255,255,255,0.15);">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border:1px solid rgba(255,255,255,0.12);padding:20px;">
+                    <p style="margin:0;color:rgba(255,255,255,0.4);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;">WHAT HAPPENS NEXT</p>
+                    <p style="margin:12px 0 0;color:#ffffff;font-size:14px;line-height:1.7;">Your order ships end of week. We&rsquo;ll confirm via WhatsApp before it goes out.</p>
+                    <p style="margin:10px 0 0;color:rgba(255,255,255,0.5);font-size:13px;line-height:1.6;">Limited archive piece secured. No restocks once this run is gone.</p>
+                    <div style="margin-top:18px;">
+                      <a href="${WHATSAPP_SUPPORT_URL}" style="display:inline-block;padding:11px 20px;background:#ffffff;color:#000000;font-size:12px;font-weight:700;letter-spacing:0.12em;text-decoration:none;text-transform:uppercase;">WHATSAPP US</a>
+                      <a href="${INSTAGRAM_URL}" style="display:inline-block;margin-left:10px;padding:11px 16px;border:1px solid rgba(255,255,255,0.15);color:#ffffff;font-size:12px;font-weight:600;letter-spacing:0.08em;text-decoration:none;text-transform:uppercase;">FOLLOW ARCHIVE</a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top:32px;">
+              <p style="margin:0;color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">MUGEN DISTRICT</p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,0.2);font-size:11px;">Unlimited territory. West African grit. Neo-Tokyo energy. Established 2026.</p>
+              <p style="margin:10px 0 0;color:rgba(255,255,255,0.2);font-size:11px;">If you didn&rsquo;t place this order, reply to this email immediately.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
-function renderCustomerFooter() {
-  return `
-    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-      The Archive
-    </div>
-    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-      Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics.
-      We don't just drop clothes; we archive movements. Established 2026.
-      From the coast of Gambia to the heart of Shibuya.
-    </div>
-    <div style="margin-top:14px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-      <span style="color:rgba(255,255,255,0.72);">Support:</span>
-      <span style="font-weight:800;"> reply to this email</span>
-    </div>
-    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-      WhatsApp: <a href="${WHATSAPP_SUPPORT_URL}" style="color:#ffffff;">${WHATSAPP_SUPPORT_URL}</a><br/>
-      Instagram: <a href="${INSTAGRAM_URL}" style="color:#ffffff;">${INSTAGRAM_URL}</a>
-    </div>
-  `;
-}
-
-function renderAdminBody(payload: OrderEmailPayload) {
-  const addressLines = nonEmptyLines(payload.shippingAddress);
-  const addressHtml = addressLines.length
-    ? addressLines.map((l) => `<div>${esc(l)}</div>`).join("")
-    : `<div>—</div>`;
-
-  const header = `
-    <div style="margin-top:18px;padding:14px 12px;border:1px solid rgba(255,255,255,0.12);">
-      <div style="font-weight:900;font-size:14px;letter-spacing:0.10em;text-transform:uppercase;color:#ff4444;">
-        ⚠️ PREORDER — Ships end of week
-      </div>
-      <div style="margin-top:12px;font-weight:900;font-size:14px;letter-spacing:0.10em;text-transform:uppercase;">
-        New Order • ${esc(payload.orderNumber)}
-      </div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        Manual payment required. WhatsApp customer before dispatch to confirm.
-      </div>
-    </div>
-  `;
-
-  const customer = `
-    <div style="margin-top:18px;">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-        Customer
-      </div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;">
-        <div style="font-weight:900;">${esc(safeName(payload.customerName))}</div>
-        <div style="color:rgba(255,255,255,0.82);">${esc(payload.customerEmail || "—")}</div>
-        <div style="color:rgba(255,255,255,0.72);margin-top:6px;">Phone: ${esc(
-          payload.customerPhone || "—"
-        )}</div>
-      </div>
-    </div>
-  `;
-
-  const shipping = `
-    <div style="margin-top:18px;">
-      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-        Shipping Address
-      </div>
-      <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">
-        ${addressHtml}
-      </div>
-    </div>
-  `;
-
-  const note = (payload.deliveryNote || "").trim();
-  const noteBlock = note
-    ? `
-      <div style="margin-top:14px;padding:12px;border:1px solid rgba(255,255,255,0.10);">
-        <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">Delivery Note</div>
-        <div style="margin-top:8px;font-size:13px;line-height:1.6;color:rgba(255,255,255,0.82);">${esc(
-          note
-        )}</div>
-      </div>
-    `
-    : "";
-
-  const table = renderOrderTable({
-    items: payload.items,
-    currency: payload.currency,
-    totalCents: payload.totalCents,
-  });
-
-  return `
-    ${header}
-    ${customer}
-    ${shipping}
-    ${noteBlock}
-    ${table}
-  `;
-}
-
-function renderAdminFooter() {
-  return `
-    <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.72);">
-      Ops Note
-    </div>
-    <div style="margin-top:10px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.82);">
-      PREORDER — ships end of week. WhatsApp customer before dispatch to confirm details. Keep a screenshot of this order.
-    </div>
-  `;
-}
+// ─── Exports ──────────────────────────────────────────────────────────────────
 
 export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
   const subject = `Your Mugen District Pre-Order is Confirmed`;
-  const preheader = `Pre-order confirmed: ${payload.orderNumber}. Your order ships end of week.`;
-
-  const html = wrapHtml({
-    preheader,
-    headlineTop: "ORDER CONFIRMED.",
-    headlineBottom: "PRE-ORDER LOCKED.",
-    bodyHtml: renderCustomerBody(payload),
-    footerHtml: renderCustomerFooter(),
-  });
-
   const text = [
     "MUGEN DISTRICT",
     "",
-    "ORDER CONFIRMED. PRE-ORDER LOCKED.",
-    "",
-    "Your order ships end of week. We'll reach out via WhatsApp to confirm before it goes out.",
-    "No restocks once this run sells out. You're locked in.",
+    "YOUR PRE-ORDER IS CONFIRMED.",
     "",
     `Order Ref: ${payload.orderNumber}`,
+    "",
+    "Your order ships end of week. We'll confirm via WhatsApp before it goes out.",
+    "Limited archive piece secured. No restocks once this run is gone.",
     "",
     "Items:",
     orderItemsText(payload.items),
@@ -489,8 +389,8 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     `Total: ${formatMoney(payload.totalCents, payload.currency)}`,
     "",
     "Shipping:",
-    `${safeName(payload.customerName)}`,
-    `${joinAddressOneLine(payload.shippingAddress) || "—"}`,
+    safeName(payload.customerName),
+    joinAddressOneLine(payload.shippingAddress) || "—",
     payload.customerPhone ? `Phone: ${payload.customerPhone}` : "",
     payload.deliveryNote ? `Note: ${payload.deliveryNote}` : "",
     "",
@@ -499,31 +399,16 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     "2. We'll WhatsApp you before it goes out to confirm details.",
     `3. WhatsApp: ${WHATSAPP_SUPPORT_URL}`,
     "",
-    "THE ARCHIVE",
-    "Mugen District is the intersection of West African grit and Neo-Tokyo aesthetics.",
-    "We don't just drop clothes; we archive movements. Established 2026.",
-    "From the coast of Gambia to the heart of Shibuya.",
-    "",
     "— MUGEN DISTRICT",
   ]
     .filter(Boolean)
     .join("\n");
 
-  return { subject, html, text };
+  return { subject, html: buildCustomerEmailHtml(payload), text };
 }
 
 export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `⚠️ PREORDER • NEW ORDER • ${payload.orderNumber}`;
-  const preheader = `PREORDER: New order ${payload.orderNumber} — ships end of week. Customer details inside.`;
-
-  const html = wrapHtml({
-    preheader,
-    headlineTop: "NEW ORDER",
-    headlineBottom: "PREORDER — END OF WEEK",
-    bodyHtml: renderAdminBody(payload),
-    footerHtml: renderAdminFooter(),
-  });
-
+  const subject = `⚠️ PREORDER • NEW ORDER • ${payload.orderNumber} — ${safeName(payload.customerName)}`;
   const text = [
     "MUGEN DISTRICT — ADMIN",
     "",
@@ -532,7 +417,7 @@ export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     `NEW ORDER: ${payload.orderNumber}`,
     "",
     "Customer:",
-    `${safeName(payload.customerName)}`,
+    safeName(payload.customerName),
     payload.customerEmail ? `Email: ${payload.customerEmail}` : "Email: —",
     payload.customerPhone ? `Phone: ${payload.customerPhone}` : "Phone: —",
     "",
@@ -553,5 +438,5 @@ export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     .filter(Boolean)
     .join("\n");
 
-  return { subject, html, text };
+  return { subject, html: buildAdminEmailHtml(payload), text };
 }
