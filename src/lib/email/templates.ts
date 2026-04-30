@@ -408,7 +408,7 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
 }
 
 export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `⚠️ PREORDER • NEW ORDER • ${payload.orderNumber} — ${safeName(payload.customerName)}`;
+  const subject = `⚠️ PREORDER — ${payload.orderNumber} — ${safeName(payload.customerName)}`;
   const text = [
     "MUGEN DISTRICT — ADMIN",
     "",
