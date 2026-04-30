@@ -185,8 +185,8 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
       <!-- Heading -->
       <tr>
       <td style="padding-bottom:40px;border-bottom:1px solid #222222;">
-        <h1 style="margin-top:0;margin-bottom:16px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:36px;font-weight:800;color:#ffffff;letter-spacing:-1px;line-height:1;text-transform:uppercase;">PRE-ORDER<br>CONFIRMED.</h1>
-        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">Your archive piece is locked in.<br>Ships end of week.</p>
+        <h1 style="margin-top:0;margin-bottom:16px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:36px;font-weight:800;color:#ffffff;letter-spacing:-1px;line-height:1;text-transform:uppercase;">ORDER<br>CONFIRMED.</h1>
+        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">Your archive piece is locked in. Enter the Mugen.</p>
       </td>
       </tr>
 
@@ -240,7 +240,7 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
       <tr>
       <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
         <p style="margin-top:0;margin-bottom:12px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">What Happens Next</p>
-        <p style="margin-top:0;margin-bottom:24px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">Your order ships end of week. We will confirm via WhatsApp before it goes out. No restocks once this run is gone &mdash; your piece is secured.</p>
+        <p style="margin-top:0;margin-bottom:24px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">We will reach out via WhatsApp with payment and delivery details. No restocks once this run is gone &mdash; your piece is secured.</p>
         <table cellpadding="0" cellspacing="0" border="0">
           <tr>
             <td style="background-color:#ffffff;padding-top:14px;padding-bottom:14px;padding-left:28px;padding-right:28px;">
@@ -424,12 +424,12 @@ function buildAdminEmailHtml(payload: OrderEmailPayload): string {
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `PRE-ORDER CONFIRMED — ${payload.orderNumber}`;
+  const subject = `ORDER CONFIRMED — ${payload.orderNumber}`;
   const text = [
     "MUGEN DISTRICT",
     "",
-    "PRE-ORDER CONFIRMED.",
-    "Your archive piece is locked in. Ships end of week.",
+    "ORDER CONFIRMED.",
+    "Your archive piece is locked in. Enter the Mugen.",
     "",
     `Order Ref: ${payload.orderNumber}`,
     `Date: ${todayString()}`,
@@ -446,7 +446,7 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     payload.deliveryNote ? `Note: ${payload.deliveryNote}` : "",
     "",
     "What Happens Next:",
-    "Your order ships end of week. We'll confirm via WhatsApp before it goes out.",
+    "We'll reach out via WhatsApp with payment and delivery details.",
     "No restocks once this run is gone — your piece is secured.",
     "WhatsApp: https://wa.me/2203340558",
     "",
@@ -460,12 +460,12 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
 }
 
 export function adminOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `⚠ PREORDER ${payload.orderNumber} — ${safeName(payload.customerName)}`;
+  const subject = `⚠ NEW ORDER — ${payload.orderNumber} — ${safeName(payload.customerName)}`;
   const text = [
     "MUGEN DISTRICT — ADMIN",
     "",
-    "⚠ PREORDER — Ships End of Week",
-    "Contact customer via WhatsApp before dispatch.",
+    "NEW ORDER",
+    "Contact customer via WhatsApp to confirm payment and arrange delivery.",
     "",
     `NEW ORDER: ${payload.orderNumber}`,
     `Date: ${todayString()}`,

@@ -90,12 +90,12 @@ export default function SuccessClient({ initialOrderId, initialOrderRef }: Props
       <div className="page__head">
         <div className="page__kicker">MUGEN DISTRICT // ARCHIVE ENTRY</div>
         <h1 className="page__title">
-          ORDER <span className="glitch" data-text="CONFIRMED.">CONFIRMED.</span>
+          ORDER <span className="glitch" data-text="ARCHIVED">ARCHIVED</span>
         </h1>
         <p className="page__sub">
-          Your pre-order is locked in. We’ll confirm via WhatsApp before it ships.
+          Unlimited territory. Your order is logged.
           <br />
-          <span className="muted">Limited archive piece secured. Ships end of week. No restocks once this run is gone.</span>
+          <span className="muted">Manual payment — we’ll reach out to complete delivery.</span>
         </p>
       </div>
 
@@ -107,7 +107,7 @@ export default function SuccessClient({ initialOrderId, initialOrderRef }: Props
           </div>
 
           <div className="muted">
-            Keep this reference. We'll confirm your pre-order via WhatsApp before it ships.
+            Keep this reference. If you want instant confirmation, hit WhatsApp.
           </div>
 
           <div className="actions">
