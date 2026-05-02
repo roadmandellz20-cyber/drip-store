@@ -37,6 +37,12 @@ const SUPABASE_STORAGE =
 
 const FALLBACK_TEST_IMAGE = `${SUPABASE_STORAGE}/ichigo-01.JPG`;
 
+const TEST_ITEM_FALLBACKS: Record<string, string> = {
+  "test-product-01": "ichigo-01",
+  "test-product-02": "luffy-01",
+  "test-product-03": "ulquiorra-01",
+};
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function esc(input: unknown) {
@@ -72,6 +78,12 @@ function safeName(name?: string) {
   return (name || "").trim() || "Customer";
 }
 
+function firstNameOnly(name?: string): string {
+  const n = (name || "").trim();
+  if (!n) return "there";
+  return n.split(/\s+/)[0] ?? "there";
+}
+
 function todayString() {
   return new Date().toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -87,6 +99,16 @@ function heroImageUrl(items: EmailOrderItem[]): string {
   return `${SUPABASE_STORAGE}/${sku}.JPG`;
 }
 
+function itemImageUrl(sku: string | undefined): string {
+  const s = (sku || "").trim();
+  if (!s) return FALLBACK_TEST_IMAGE;
+  if (s.startsWith("test-")) {
+    const fallback = TEST_ITEM_FALLBACKS[s] ?? "ichigo-01";
+    return `${SUPABASE_STORAGE}/${fallback}.JPG`;
+  }
+  return `${SUPABASE_STORAGE}/${s}.JPG`;
+}
+
 function orderItemsText(items: EmailOrderItem[]) {
   return items
     .map((it) => {
@@ -97,26 +119,36 @@ function orderItemsText(items: EmailOrderItem[]) {
     .join("\n");
 }
 
-// ─── Item rows (Gmail-safe) ───────────────────────────────────────────────────
+// ─── Customer item rows (Everlane-style, white card) ─────────────────────────
 
 function buildCustomerItemRows(items: EmailOrderItem[]) {
   return items
-    .map(
-      (it) =>
-        `<table width="100%" cellpadding="0" cellspacing="0" border="0">
+    .map((it) => {
+      const img = itemImageUrl(it.sku);
+      const name = esc(it.title);
+      const sku = esc(it.sku?.trim() || "—");
+      const size = esc((it.size || "M").toUpperCase());
+      return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td style="padding-top:16px;padding-bottom:16px;padding-left:0;padding-right:0;border-top:1px solid #1a1a1a;">
-      <p style="margin-top:0;margin-bottom:5px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;">${esc(it.title)}</p>
-      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:11px;color:#555555;">SKU: ${esc(it.sku?.trim() || "—")} &nbsp;&bull;&nbsp; SIZE: ${esc((it.size || "M").toUpperCase())} &nbsp;&bull;&nbsp; QTY: ${esc(it.qty)}</p>
+    <td width="120" valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;">
+      <img src="${img}" width="100" height="100" style="display:block;width:100px;height:100px;object-fit:cover;" alt="${name}" />
     </td>
-    <td align="right" valign="top" style="padding-top:16px;padding-bottom:16px;padding-left:0;padding-right:0;border-top:1px solid #1a1a1a;">
-      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:15px;font-weight:bold;color:#ffffff;">GMD ${esc(formatMajor(it.lineTotalCents))}</p>
+    <td valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:16px;padding-right:0;">
+      <p style="margin-top:0;margin-bottom:4px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#111111;">${name}</p>
+      <p style="margin-top:0;margin-bottom:2px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">SKU: ${sku}</p>
+      <p style="margin-top:0;margin-bottom:2px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">Size: ${size}</p>
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">Quantity: ${esc(it.qty)}</p>
+    </td>
+    <td valign="top" align="right" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;">
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#111111;">GMD ${esc(formatMajor(it.lineTotalCents))}</p>
     </td>
   </tr>
-</table>`
-    )
+</table>`;
+    })
     .join("");
 }
+
+// ─── Admin item rows (dark theme) ────────────────────────────────────────────
 
 function buildAdminItemRows(items: EmailOrderItem[]) {
   return items
@@ -138,11 +170,24 @@ function buildAdminItemRows(items: EmailOrderItem[]) {
     .join("");
 }
 
-// ─── Customer HTML (Gmail-safe) ───────────────────────────────────────────────
+// ─── Divider helper ───────────────────────────────────────────────────────────
+
+function dividerRow(hPadding = 32) {
+  return `<tr>
+<td style="padding-top:0;padding-bottom:0;padding-left:${hPadding}px;padding-right:${hPadding}px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr><td style="border-bottom:1px solid #eeeeee;font-size:1px;line-height:1px;">&nbsp;</td></tr>
+  </table>
+</td>
+</tr>`;
+}
+
+// ─── Customer HTML — Everlane-style white card ────────────────────────────────
 
 function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
   const imgUrl = heroImageUrl(payload.items);
   const productName = esc(payload.items[0]?.title ?? "Mugen District");
+  const firstName = esc(firstNameOnly(payload.customerName));
 
   const addressLines = nonEmptyLines(payload.shippingAddress);
   const addressHtml = addressLines.length
@@ -159,107 +204,114 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
 
 <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000">
 <tr>
-<td align="center" style="background-color:#000000;padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;">
+<td align="center" style="background-color:#000000;padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;">
 
-  <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000">
+  <!-- White card -->
+  <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;background-color:#ffffff;">
 
     <!-- Hero image -->
     <tr>
     <td style="padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;">
-      <img src="${imgUrl}" width="600" height="400" style="display:block;width:100%;height:auto;" alt="${productName}" />
+      <img src="${imgUrl}" width="600" height="280" style="display:block;width:100%;height:280px;object-fit:cover;" alt="${productName}" />
     </td>
     </tr>
 
-    <!-- Content -->
+    <!-- Brand name -->
     <tr>
-    <td style="padding-top:48px;padding-bottom:48px;padding-left:48px;padding-right:48px;background-color:#000000;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <td align="center" style="padding-top:28px;padding-bottom:4px;padding-left:0;padding-right:0;background-color:#ffffff;">
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:4px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT</p>
+    </td>
+    </tr>
 
-      <!-- Brand label -->
+    <!-- Heading -->
+    <tr>
+    <td align="center" style="padding-top:16px;padding-bottom:8px;padding-left:40px;padding-right:40px;background-color:#ffffff;">
+      <h1 style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Georgia,Times New Roman,Times,serif;font-size:28px;font-weight:300;color:#111111;line-height:1.2;">Thanks for your order, ${firstName}.</h1>
+    </td>
+    </tr>
+
+    <!-- Order number -->
+    <tr>
+    <td align="center" style="padding-top:8px;padding-bottom:0;padding-left:0;padding-right:0;background-color:#ffffff;">
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;color:#aaaaaa;">Order No. ${esc(payload.orderNumber)}</p>
+    </td>
+    </tr>
+
+    <!-- Three-column info row -->
+    <tr>
+    <td style="padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;background-color:#ffffff;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr>
-      <td style="padding-bottom:40px;">
-        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#666666;text-transform:uppercase;">MUGEN DISTRICT &#28961;&#38480;</p>
-      </td>
+        <td width="33%" valign="top" style="padding-top:24px;padding-bottom:24px;padding-left:32px;padding-right:16px;border-right:1px solid #eeeeee;">
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Shipping to</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;line-height:1.5;">${esc(safeName(payload.customerName))}<br>${addressHtml}</p>
+        </td>
+        <td width="33%" valign="top" align="center" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:16px;border-right:1px solid #eeeeee;">
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Order reference</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;">${esc(payload.orderNumber)}</p>
+        </td>
+        <td width="33%" valign="top" align="right" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:32px;">
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Date ordered</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;">${esc(todayString())}</p>
+        </td>
       </tr>
+      </table>
+    </td>
+    </tr>
 
-      <!-- Heading -->
+    ${dividerRow()}
+
+    <!-- Order Summary title -->
+    <tr>
+    <td align="center" style="padding-top:28px;padding-bottom:16px;padding-left:0;padding-right:0;background-color:#ffffff;">
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;letter-spacing:2px;color:#aaaaaa;text-transform:uppercase;">Your Order Summary</p>
+    </td>
+    </tr>
+
+    ${dividerRow()}
+
+    <!-- Items -->
+    <tr>
+    <td style="padding-top:0;padding-bottom:0;padding-left:32px;padding-right:32px;background-color:#ffffff;">
+      ${buildCustomerItemRows(payload.items)}
+    </td>
+    </tr>
+
+    ${dividerRow()}
+
+    <!-- Total -->
+    <tr>
+    <td style="padding-top:16px;padding-bottom:16px;padding-left:32px;padding-right:32px;background-color:#ffffff;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr>
-      <td style="padding-bottom:40px;border-bottom:1px solid #222222;">
-        <h1 style="margin-top:0;margin-bottom:16px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:36px;font-weight:800;color:#ffffff;letter-spacing:-1px;line-height:1;text-transform:uppercase;">ORDER<br>CONFIRMED.</h1>
-        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">Your archive piece is locked in. Enter the Mugen.</p>
-      </td>
+        <td><p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#333333;">Total</p></td>
+        <td align="right"><p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:18px;font-weight:bold;color:#111111;">GMD ${esc(formatMajor(payload.totalCents))}</p></td>
       </tr>
+      </table>
+    </td>
+    </tr>
 
-      <!-- Order ref -->
-      <tr>
-      <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    ${dividerRow()}
+
+    <!-- What happens next + WhatsApp button -->
+    <tr>
+    <td style="padding-top:32px;padding-bottom:32px;padding-left:40px;padding-right:40px;background-color:#ffffff;">
+      <p style="margin-top:0;margin-bottom:16px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#333333;line-height:1.7;">We&rsquo;ll reach out via WhatsApp to confirm payment and arrange delivery. Your piece is secured &mdash; no restocks once this run is gone.</p>
+      <table cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td>
-            <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">Order Reference</p>
-            <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:18px;font-weight:bold;color:#ffffff;">${esc(payload.orderNumber)}</p>
-          </td>
-          <td align="right">
-            <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">Date</p>
-            <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:11px;color:#555555;">${esc(todayString())}</p>
+          <td style="background-color:#111111;padding-top:14px;padding-bottom:14px;padding-left:28px;padding-right:28px;">
+            <a href="https://wa.me/2203340558" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;text-transform:uppercase;display:block;">CONTACT US ON WHATSAPP &#8594;</a>
           </td>
         </tr>
-        </table>
-      </td>
-      </tr>
+      </table>
+    </td>
+    </tr>
 
-      <!-- Items -->
-      <tr>
-      <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
-        <p style="margin-top:0;margin-bottom:20px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">Archive Items</p>
-        ${buildCustomerItemRows(payload.items)}
-      </td>
-      </tr>
-
-      <!-- Total -->
-      <tr>
-      <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td><p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">Total</p></td>
-          <td align="right"><p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:20px;font-weight:bold;color:#ffffff;">GMD ${esc(formatMajor(payload.totalCents))}</p></td>
-        </tr>
-        </table>
-      </td>
-      </tr>
-
-      <!-- Shipping to -->
-      <tr>
-      <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
-        <p style="margin-top:0;margin-bottom:12px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">Shipping To</p>
-        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">${esc(safeName(payload.customerName))}<br>${addressHtml}</p>
-      </td>
-      </tr>
-
-      <!-- What happens next -->
-      <tr>
-      <td style="padding-top:32px;padding-bottom:32px;padding-left:0;padding-right:0;border-bottom:1px solid #222222;">
-        <p style="margin-top:0;margin-bottom:12px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#555555;text-transform:uppercase;">What Happens Next</p>
-        <p style="margin-top:0;margin-bottom:24px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#888888;line-height:1.7;">We will reach out via WhatsApp with payment and delivery details. No restocks once this run is gone &mdash; your piece is secured.</p>
-        <table cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td style="background-color:#ffffff;padding-top:14px;padding-bottom:14px;padding-left:28px;padding-right:28px;">
-              <a href="https://wa.me/2203340558" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#000000;text-decoration:none;text-transform:uppercase;display:block;">WHATSAPP US &#8594;</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-      </tr>
-
-      <!-- Footer -->
-      <tr>
-      <td style="padding-top:48px;">
-        <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;font-weight:bold;letter-spacing:3px;color:#333333;text-transform:uppercase;">MUGEN DISTRICT</p>
-        <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;color:#333333;line-height:1.7;">Limited archive release. No mass restocks.<br>Enter the Mugen.</p>
-      </td>
-      </tr>
-
-    </table>
+    <!-- Footer -->
+    <tr>
+    <td align="center" style="padding-top:24px;padding-bottom:24px;padding-left:32px;padding-right:32px;border-top:1px solid #eeeeee;background-color:#ffffff;">
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT &bull; <a href="https://mugendistrict.com/privacy" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#aaaaaa;text-decoration:none;text-transform:uppercase;">Privacy Policy</a></p>
+      <p style="margin-top:8px;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;color:#cccccc;">Limited archive release. No mass restocks. Enter the Mugen.</p>
     </td>
     </tr>
 
@@ -272,7 +324,7 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
 </html>`;
 }
 
-// ─── Admin HTML (Gmail-safe) ──────────────────────────────────────────────────
+// ─── Admin HTML — dark theme ──────────────────────────────────────────────────
 
 function buildAdminEmailHtml(payload: OrderEmailPayload): string {
   const imgUrl = heroImageUrl(payload.items);
@@ -424,12 +476,11 @@ function buildAdminEmailHtml(payload: OrderEmailPayload): string {
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
-  const subject = `ORDER CONFIRMED — ${payload.orderNumber}`;
+  const subject = `Thanks for your order — ${payload.orderNumber}`;
   const text = [
     "MUGEN DISTRICT",
     "",
-    "ORDER CONFIRMED.",
-    "Your archive piece is locked in. Enter the Mugen.",
+    `Thanks for your order, ${firstNameOnly(payload.customerName)}.`,
     "",
     `Order Ref: ${payload.orderNumber}`,
     `Date: ${todayString()}`,
@@ -445,8 +496,7 @@ export function customerOrderEmail(payload: OrderEmailPayload): EmailTemplate {
     payload.customerPhone ? `Phone: ${payload.customerPhone}` : "",
     payload.deliveryNote ? `Note: ${payload.deliveryNote}` : "",
     "",
-    "What Happens Next:",
-    "We'll reach out via WhatsApp with payment and delivery details.",
+    "We'll reach out via WhatsApp to confirm payment and arrange delivery.",
     "No restocks once this run is gone — your piece is secured.",
     "WhatsApp: https://wa.me/2203340558",
     "",

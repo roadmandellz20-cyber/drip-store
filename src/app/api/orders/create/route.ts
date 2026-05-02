@@ -47,6 +47,7 @@ type IncomingItem = {
   sku?: string;
   size?: string;
   qty?: number;
+  quantity?: number;
 };
 
 type IncomingShipping = {
@@ -285,7 +286,7 @@ function sanitizeIncomingCart(items: IncomingItem[]) {
     slug: sanitizeSlugInput(item.slug, 64),
     sku: sanitizeSlugInput(item.sku, 64),
     size: sanitizeSingleLineInput(item.size, { uppercase: true, maxLength: 10 }),
-    qty: asNumber(item.qty),
+    qty: asNumber(item.qty ?? item.quantity),
   }));
 }
 
