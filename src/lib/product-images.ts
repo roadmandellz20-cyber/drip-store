@@ -14,11 +14,7 @@ export function isLocalProductAsset(src?: string) {
   return typeof src === "string" && PRODUCT_IMAGE_PATH_RE.test(src);
 }
 
-export function getPreferredProductImageSrc(src: string, fallbackSrc?: string): string {
-  if (typeof fallbackSrc === "string" && isLocalProductAsset(fallbackSrc)) {
-    return fallbackSrc;
-  }
-
+export function getPreferredProductImageSrc(src: string, _fallbackSrc?: string): string {
   return src;
 }
 
