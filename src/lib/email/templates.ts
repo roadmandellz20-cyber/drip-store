@@ -126,20 +126,18 @@ function buildCustomerItemRows(items: EmailOrderItem[]) {
     .map((it) => {
       const img = itemImageUrl(it.sku);
       const name = esc(it.title);
-      const sku = esc(it.sku?.trim() || "—");
       const size = esc((it.size || "M").toUpperCase());
       return `<table width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr>
-    <td width="120" valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;">
+    <td width="116" valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:16px;vertical-align:top;border-top:1px solid #eeeeee;">
       <img src="${img}" width="100" height="100" style="display:block;width:100px;height:100px;object-fit:cover;" alt="${name}" />
     </td>
-    <td valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:16px;padding-right:0;">
+    <td valign="top" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;vertical-align:top;border-top:1px solid #eeeeee;">
       <p style="margin-top:0;margin-bottom:4px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#111111;">${name}</p>
-      <p style="margin-top:0;margin-bottom:2px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">SKU: ${sku}</p>
       <p style="margin-top:0;margin-bottom:2px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">Size: ${size}</p>
       <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;color:#888888;">Quantity: ${esc(it.qty)}</p>
     </td>
-    <td valign="top" align="right" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;">
+    <td valign="top" align="right" style="padding-top:20px;padding-bottom:20px;padding-left:0;padding-right:0;vertical-align:top;text-align:right;border-top:1px solid #eeeeee;">
       <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;font-weight:bold;color:#111111;">GMD ${esc(formatMajor(it.lineTotalCents))}</p>
     </td>
   </tr>
@@ -185,8 +183,7 @@ function dividerRow(hPadding = 32) {
 // ─── Customer HTML — Everlane-style white card ────────────────────────────────
 
 function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
-  const imgUrl = heroImageUrl(payload.items);
-  const productName = esc(payload.items[0]?.title ?? "Mugen District");
+  const heroUrl = "https://mugendistrict.com/archive/assets/hero-bg.jpg";
   const firstName = esc(firstNameOnly(payload.customerName));
 
   const addressLines = nonEmptyLines(payload.shippingAddress);
@@ -209,17 +206,17 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
   <!-- White card -->
   <table width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:100%;max-width:600px;background-color:#ffffff;">
 
-    <!-- Hero image -->
+    <!-- Hero image — black bg + opacity:0.6 creates the dark overlay -->
     <tr>
-    <td style="padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;">
-      <img src="${imgUrl}" width="600" height="280" style="display:block;width:100%;height:280px;object-fit:cover;" alt="${productName}" />
+    <td style="padding-top:0;padding-bottom:0;padding-left:0;padding-right:0;background-color:#000000;line-height:0;">
+      <img src="${heroUrl}" width="600" height="220" style="display:block;width:100%;height:220px;object-fit:cover;opacity:0.6;" alt="Mugen District" />
     </td>
     </tr>
 
     <!-- Brand name -->
     <tr>
     <td align="center" style="padding-top:28px;padding-bottom:4px;padding-left:0;padding-right:0;background-color:#ffffff;">
-      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:4px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT</p>
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:4px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT &#28961;&#38480;</p>
     </td>
     </tr>
 
@@ -232,10 +229,12 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
 
     <!-- Order number -->
     <tr>
-    <td align="center" style="padding-top:8px;padding-bottom:0;padding-left:0;padding-right:0;background-color:#ffffff;">
+    <td align="center" style="padding-top:8px;padding-bottom:24px;padding-left:0;padding-right:0;background-color:#ffffff;">
       <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;color:#aaaaaa;">Order No. ${esc(payload.orderNumber)}</p>
     </td>
     </tr>
+
+    ${dividerRow()}
 
     <!-- Three-column info row -->
     <tr>
@@ -243,16 +242,16 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr>
         <td width="33%" valign="top" style="padding-top:24px;padding-bottom:24px;padding-left:32px;padding-right:16px;border-right:1px solid #eeeeee;">
-          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Shipping to</p>
-          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;line-height:1.5;">${esc(safeName(payload.customerName))}<br>${addressHtml}</p>
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-style:italic;color:#aaaaaa;">Shipping to</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;color:#333333;line-height:1.6;">${esc(safeName(payload.customerName))}<br>${addressHtml}</p>
         </td>
-        <td width="33%" valign="top" align="center" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:16px;border-right:1px solid #eeeeee;">
-          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Order reference</p>
-          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;">${esc(payload.orderNumber)}</p>
+        <td width="33%" valign="top" align="center" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:16px;border-right:1px solid #eeeeee;text-align:center;">
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-style:italic;color:#aaaaaa;">Order reference</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Courier New,Courier,monospace;font-size:13px;font-weight:bold;color:#111111;">${esc(payload.orderNumber)}</p>
         </td>
-        <td width="33%" valign="top" align="right" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:32px;">
-          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:12px;font-style:italic;color:#aaaaaa;">Date ordered</p>
-          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:bold;color:#333333;">${esc(todayString())}</p>
+        <td width="33%" valign="top" align="right" style="padding-top:24px;padding-bottom:24px;padding-left:16px;padding-right:32px;text-align:right;">
+          <p style="margin-top:0;margin-bottom:6px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-style:italic;color:#aaaaaa;">Date ordered</p>
+          <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;color:#333333;">${esc(todayString())}</p>
         </td>
       </tr>
       </table>
@@ -268,9 +267,7 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
     </td>
     </tr>
 
-    ${dividerRow()}
-
-    <!-- Items -->
+    <!-- Items — each row carries its own border-top -->
     <tr>
     <td style="padding-top:0;padding-bottom:0;padding-left:32px;padding-right:32px;background-color:#ffffff;">
       ${buildCustomerItemRows(payload.items)}
@@ -293,14 +290,14 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
 
     ${dividerRow()}
 
-    <!-- What happens next + WhatsApp button -->
+    <!-- Confirmation message + WhatsApp button -->
     <tr>
     <td style="padding-top:32px;padding-bottom:32px;padding-left:40px;padding-right:40px;background-color:#ffffff;">
-      <p style="margin-top:0;margin-bottom:16px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#333333;line-height:1.7;">We&rsquo;ll reach out via WhatsApp to confirm payment and arrange delivery. Your piece is secured &mdash; no restocks once this run is gone.</p>
+      <p style="margin-top:0;margin-bottom:24px;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:14px;color:#333333;line-height:1.7;">Your order is confirmed. We will be in touch via WhatsApp before it ships.</p>
       <table cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td style="background-color:#111111;padding-top:14px;padding-bottom:14px;padding-left:28px;padding-right:28px;">
-            <a href="https://wa.me/2203340558" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;text-transform:uppercase;display:block;">CONTACT US ON WHATSAPP &#8594;</a>
+            <a href="https://wa.me/2203340558" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;font-weight:bold;letter-spacing:2px;color:#ffffff;text-decoration:none;text-transform:uppercase;display:block;">CONTACT US &#8594;</a>
           </td>
         </tr>
       </table>
@@ -310,8 +307,7 @@ function buildCustomerEmailHtml(payload: OrderEmailPayload): string {
     <!-- Footer -->
     <tr>
     <td align="center" style="padding-top:24px;padding-bottom:24px;padding-left:32px;padding-right:32px;border-top:1px solid #eeeeee;background-color:#ffffff;">
-      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT &bull; <a href="https://mugendistrict.com/privacy" style="font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#aaaaaa;text-decoration:none;text-transform:uppercase;">Privacy Policy</a></p>
-      <p style="margin-top:8px;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;color:#cccccc;">Limited archive release. No mass restocks. Enter the Mugen.</p>
+      <p style="margin-top:0;margin-bottom:0;margin-left:0;margin-right:0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:11px;letter-spacing:2px;color:#aaaaaa;text-transform:uppercase;">MUGEN DISTRICT &bull; No mass restocks &bull; Enter the Mugen</p>
     </td>
     </tr>
 
